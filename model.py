@@ -12,9 +12,16 @@ import numpy as np
 import math
 import random
 import pygame
+import matplotlib.pyplot as plt
 
 #--------------------------------- CONSTANTS ----------------------------------
 
+#- Number of sets of simulations run
+SET_NUM = 10
+#- Number of simulations run per set
+SIMULATION_NUM = 10
+#- Number of time steps in the simulation
+TIME_STEPS = 1000
 #- Grid size
 m = 80 #- Vertical
 n = 80 #- Horizontal
@@ -50,6 +57,79 @@ PREDATOR_COLOR = (255, 0, 0)
 #- Plant colors are interpolated between these two
 PLANT_GROWN_COLOR = (0, 255, 0)
 PLANT_UNGROWN_COLOR = (255, 255, 0)
+
+def runSets():
+    """
+    Runs multiple sets of simulations, then prints average populations at the
+    end of the simulation and the standard deviation of the populations.
+    """
+    preyPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
+    predatorPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
+    for i in range(SET_NUM):
+        preyPopulations[i], predatorPopulations[i] = runSet()
+    print(
+f"""
+Populations at end of simulation
+Averages
+    Prey: {np.average(preyPopulations[:, :, -1])}
+    Predators: {np.average(predatorPopulations[:, :, -1])}
+Standard Deviations:
+    Prey: {np.std(np.average(preyPopulations[:, :, -1], axis=0))}
+    Predators: {np.std(np.average(predatorPopulations[:, :, -1], axis=0))}
+"""
+        )
+
+def runSet():
+    """
+    Runs a single set of simulations.
+
+    Returns
+    -------
+    preyPopulations : 2d scalar array
+        The number of prey alive at each time step in each simulation
+    predatorPopulations : 2d scalar array
+        The number of predators alive at each time step in each simulation
+    """
+    preyPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
+    predatorPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
+    for i in range(SIMULATION_NUM):
+        preyPopulations[i], predatorPopulations[i] = runSimulation(False)
+    return preyPopulations, predatorPopulations
+
+def runSimulation(shouldVisualize = False):
+    """
+    Runs a single simulation.
+
+    Parameters
+    ----------
+    shouldVisualize : bool
+        Whether to visualize the simulation using pygame
+    Returns
+    -------
+    preyPopulations : 1d scalar array
+        The number of prey alive at each time step
+    predatorPopulations : 1d scalar array
+        The number of predators alive at each time step
+    """
+    preyPopulations = np.zeros(TIME_STEPS)
+    predatorPopulations = np.zeros(TIME_STEPS)
+    #- Initializes the program
+    prey, preyMask, predators, predatorMask, plants, plantMask = initialize()
+    if shouldVisualize:
+        screen = initVisualization()
+    for i in range(TIME_STEPS):
+        #- Runs a single feed cycle
+        feed(prey, preyMask, predators, predatorMask, plants, plantMask)
+        if shouldVisualize:
+            #- Visualizes the grid
+            if not visualize(screen, preyMask, predatorMask,
+                             plantMask, plants):
+                break
+        preyPopulations[i] = np.count_nonzero(preyMask)
+        predatorPopulations[i] = np.count_nonzero(predatorMask)
+    if shouldVisualize:
+        pygame.quit()
+    return (preyPopulations, predatorPopulations)
 
 def initialize():
     """
@@ -122,7 +202,23 @@ def initialize():
     return (prey, preyMask, predators, predatorMask, \
             plants, plantMask)
 
-def visualize(preyMask, predatorMask, plantMask, plants):
+def initVisualization():
+    """
+    Begins the visiualization.
+
+    Returns
+    -------
+    screen : Surface
+        The surface to draw stuff on
+    """
+    #- Begins the visualization
+    pygame.init()
+    screen = pygame.display.set_mode([m * PIXEL_SIZE, n * PIXEL_SIZE])
+    #- Sets background color
+    screen.fill((255, 255, 255))
+    return screen
+
+def visualize(screen, preyMask, predatorMask, plantMask, plants):
     """
     Visualizes the prey, predators, and plants using the constant colors and
     constant background color. Also uses PIXEL_SIZE and the grid size given by
@@ -130,6 +226,8 @@ def visualize(preyMask, predatorMask, plantMask, plants):
 
     Parameters
     ----------
+    screen: Surface
+        The surface to draw stuff on
     preyMask : 2d boolean array
         The locations that contain prey
     predatorMask : 2d boolean array
@@ -139,40 +237,32 @@ def visualize(preyMask, predatorMask, plantMask, plants):
     plantMask : 2d boolean array
         The locations that contain plants
     """
-    #- Begins the visualization
-    pygame.init()
-    screen = pygame.display.set_mode([m * PIXEL_SIZE, n * PIXEL_SIZE])
-    running = True
-    while running:
-        #- Checks to see if the window has been closed
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-        #- Sets background color
-        screen.fill((255, 255, 255))
-        #- Iterates through grid
-        for i in range(m):
-            for j in range(n):
-                #- Draws a rectangle for each prey, predator, and plant
-                rect = pygame.Rect(i * PIXEL_SIZE, j * PIXEL_SIZE,
-                                   PIXEL_SIZE, PIXEL_SIZE)
-                if preyMask[i, j]:
-                    pygame.draw.rect(screen, PREY_COLOR, rect)
-                elif predatorMask[i, j]:
-                    pygame.draw.rect(screen, PREDATOR_COLOR, rect)
-                elif plantMask[i, j]:
-                    plantUngrownColor = np.array(PLANT_UNGROWN_COLOR)
-                    plantGrownColor = np.array(PLANT_GROWN_COLOR)
-                    #- Interpolates color between plantUngrownColor and
-                    #  plantGrownColor depending on how grown the plant is
-                    plantColor = plantUngrownColor * plants[i, j] / \
-                        PLANT_REGROWTH_TIME + plantGrownColor * (1 -
-                        (plants[i, j] / PLANT_REGROWTH_TIME))
-                    pygame.draw.rect(screen, plantColor, rect)
+    #- Checks to see if the window has been closed
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            return False
+    #- Iterates through grid
+    for i in range(m):
+        for j in range(n):
+            #- Draws a rectangle for each prey, predator, and plant
+            rect = pygame.Rect(i * PIXEL_SIZE, j * PIXEL_SIZE,
+                               PIXEL_SIZE, PIXEL_SIZE)
+            if preyMask[i, j]:
+                pygame.draw.rect(screen, PREY_COLOR, rect)
+            elif predatorMask[i, j]:
+                pygame.draw.rect(screen, PREDATOR_COLOR, rect)
+            elif plantMask[i, j]:
+                plantUngrownColor = np.array(PLANT_UNGROWN_COLOR)
+                plantGrownColor = np.array(PLANT_GROWN_COLOR)
+                #- Interpolates color between plantUngrownColor and
+                #  plantGrownColor depending on how grown the plant is
+                plantColor = plantUngrownColor * plants[i, j] / \
+                    PLANT_REGROWTH_TIME + plantGrownColor * (1 -
+                    (plants[i, j] / PLANT_REGROWTH_TIME))
+                pygame.draw.rect(screen, plantColor, rect)
         #- Updates display
         pygame.display.flip()
-    #- Quits pygame
-    pygame.quit()
+    return True
 
 def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
     """
@@ -231,9 +321,4 @@ def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
     
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
-    #- Initializes the program
-    prey, preyMask, predators, predatorMask, plants, plantMask = initialize()
-    #- Runs a single feed cycle
-    feed(prey, preyMask, predators, predatorMask, plants, plantMask)
-    #- Visualizes the grid
-    visualize(preyMask, predatorMask, plantMask, plants)
+    runSimulation(True)

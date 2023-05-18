@@ -9,13 +9,27 @@ Created on Wed May 17 17:38:22 2023
 import model
 import numpy as np
 
+def setsTest():
+    """
+    Tests to ensure that runSets() works properly.
+    """
+    model.TIME_STEPS = 1
+    model.runSets()
+
 def spawnTest():
     """
     Tests random prey, plant, and predator spawning.
     """
     prey, preyMask, predator, predatorMask, plants, plantMask = \
         model.initialize()
-    model.visualize(preyMask, predatorMask, plantMask, plants)
+    screen = model.initVisualization()
+    running = True
+    while running:
+        model.visualize(screen, preyMask, predatorMask, plantMask, plants)
+        for event in model.pygame.event.get():
+            if event.type == model.pygame.QUIT:
+                running = False
+    model.pygame.quit()
 
 def testFeed(y, x):
     """
@@ -144,7 +158,7 @@ def eatUngrownPlantTest():
     assert(plants[y, x] == model.PLANT_REGROWTH_TIME - 1)
     assert(prey[y, x, 0] == 15)
     
-    
+setsTest()
 spawnTest()
 stunTest()
 killTest()
