@@ -108,8 +108,6 @@ def eatPlantTest():
     """
     y = 4
     x = 4
-    model.STUN_CHANCE = 0.0
-    model.PREY_KILL_CHANCE = 0.0
     prey, preyMask, predators, predatorMask, plants, plantMask = \
         model.initialize()
     prey[y, x, 0] = 15
@@ -132,8 +130,6 @@ def eatUngrownPlantTest():
     """
     y = 4
     x = 4
-    model.STUN_CHANCE = 0.0
-    model.PREY_KILL_CHANCE = 0.0
     prey, preyMask, predators, predatorMask, plants, plantMask = \
         model.initialize()
     prey[y, x, 0] = 15
