@@ -76,7 +76,7 @@ def initialize():
     return (prey, preyMask, predators, predatorMask, \
             plants, plantMask)
 
-def visualize(preyMask, predatorMask, plantMask):
+def visualize(preyMask, predatorMask, plantMask, plants):
     pygame.init()
     screen = pygame.display.set_mode([m * PIXEL_SIZE, n * PIXEL_SIZE])
     running = True
@@ -136,4 +136,4 @@ def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
 if (__name__ == '__main__'):
     prey, preyMask, predators, predatorMask, plants, plantMask = initialize()
     feed(prey, preyMask, predators, predatorMask, plants, plantMask)
-    visualize(preyMask, predatorMask, plantMask)
+    visualize(preyMask, predatorMask, plantMask, plants)
