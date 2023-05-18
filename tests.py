@@ -11,13 +11,40 @@ import numpy as np
 
 def spawnTest():
     """
-    Tests the random spawning of prey, predators, and plants.
+    Tests random prey, plant, and predator spawning.
     """
     prey, preyMask, predator, predatorMask, plants, plantMask = \
         model.initialize()
     model.visualize(preyMask, predatorMask, plantMask, plants)
 
 def testFeed(y, x):
+    """
+    Util function used by other testing functions to avoid rewriting code.
+
+    Parameters
+    ----------
+    y : int
+        y coordinate to test
+    x : int
+        x coordinate to test
+
+    Returns
+    -------
+    prey : 3d scalar array
+        First two dimension correspond to position, third dimension is energy
+        and time until possible reproduction.
+    preyMask : 2d boolean array
+        The locations that contain prey
+    predators : 3d scalar array
+        First two dimension correspond to position, third dimension is energy,
+        time until possible reproduction, and stun time
+    predatorMask : 2d boolean array
+        The locations that contain predators
+    plants : 2d scalar array
+        The time until plants will be regrown
+    plantMask : 2d boolean array
+        The locations that contain plants
+    """
     prey, preyMask, predators, predatorMask, plants, plantMask = \
         model.initialize()
     prey[y, x, 0] = model.PREY_START_ENERGY
@@ -31,6 +58,10 @@ def testFeed(y, x):
     return (prey, preyMask, predators, predatorMask, plants, plantMask)
 
 def stunTest():
+    """
+    Tests stunning by changing the STUN_CHANCE to 1 (100%) and placing a prey
+    and predator on top of each other.
+    """
     y = 4
     x = 4
     model.STUN_CHANCE = 1.0
@@ -41,6 +72,10 @@ def stunTest():
     assert(predators[y, x, 2] == model.STUN_TIME)
 
 def killTest():
+    """
+    Tests defending by changing the PREY_KILL_CHANCE to 1 (100%) and placing a
+    prey and predator on top of each other.
+    """
     y = 4
     x = 4
     model.STUN_CHANCE = 0.0
@@ -51,6 +86,10 @@ def killTest():
     assert(np.array_equal(predators[y, x], np.array([0, 0, 0])))
 
 def eatTest():
+    """
+    Tests eating by changing the PREY_KILL_CHANCE and STUN_CHANCE to 0 (0%)
+    and placing a prey and predator on top of each other.
+    """
     y = 4
     x = 4
     model.STUN_CHANCE = 0.0
@@ -64,6 +103,9 @@ def eatTest():
         model.PREDATOR_MAX_ENERGY))
 
 def eatPlantTest():
+    """
+    Tests eating plants by placing a prey and grown plant on top of each other.
+    """
     y = 4
     x = 4
     model.STUN_CHANCE = 0.0
@@ -84,6 +126,10 @@ def eatPlantTest():
         model.PREY_MAX_ENERGY))
 
 def eatUngrownPlantTest():
+    """
+    Tests eating (or in this case, not eating) ungrown plants by placing a prey
+    and ungrown plant on top of each other.
+    """
     y = 4
     x = 4
     model.STUN_CHANCE = 0.0
