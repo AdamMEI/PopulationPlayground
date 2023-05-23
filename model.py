@@ -13,6 +13,7 @@ import math
 import random
 import pygame
 import matplotlib.pyplot as plt
+import time
 
 #--------------------------------- CONSTANTS ----------------------------------
 
@@ -21,7 +22,7 @@ SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 10
 #- Number of time steps in the simulation
-TIME_STEPS = 1000
+TIME_STEPS = 100
 #- Grid size
 m = 80 #- Vertical
 n = 80 #- Horizontal
@@ -71,8 +72,8 @@ def runSets():
 f"""
 Populations at end of simulation
 Averages
-    Prey: {np.average(preyPopulations[:, :, -1])}
-    Predators: {np.average(predatorPopulations[:, :, -1])}
+    Prey: {np.average(preyPopulations[:, :])}
+    Predators: {np.average(predatorPopulations[:, :])}
 Standard Deviations:
     Prey: {np.std(np.average(preyPopulations[:, :, -1], axis=0))}
     Predators: {np.std(np.average(predatorPopulations[:, :, -1], axis=0))}
@@ -111,22 +112,28 @@ def runSimulation(shouldVisualize = False):
     predatorPopulations : 1d scalar array
         The number of predators alive at each time step
     """
+    t('X')
     preyPopulations = np.zeros(TIME_STEPS)
     predatorPopulations = np.zeros(TIME_STEPS)
     #- Initializes the program
     prey, preyMask, predators, predatorMask, plants, plantMask = initialize()
     if shouldVisualize:
         screen = initVisualization()
+    t('X')
     for i in range(TIME_STEPS):
         #- Runs a single feed cycle
+        t('1.1')
         feed(prey, preyMask, predators, predatorMask, plants, plantMask)
+        t('1.2')
         if shouldVisualize:
             #- Visualizes the grid
             if not visualize(screen, preyMask, predatorMask,
                              plantMask, plants):
                 break
+        t('X')
         preyPopulations[i] = np.count_nonzero(preyMask)
         predatorPopulations[i] = np.count_nonzero(predatorMask)
+        t('1.4')
     if shouldVisualize:
         pygame.quit()
     return (preyPopulations, predatorPopulations)
@@ -287,38 +294,114 @@ def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
         The locations that contain plants
     """
     #- Mask of overlapping prey and predators
+    t('1.1.1')
     overlappingMask = preyMask * predatorMask
+    overlappingNum = np.count_nonzero(overlappingMask)
     #- Stuns predators
-    stunnedChances = np.random.random((m, n))
-    stunnedMask = (stunnedChances < STUN_CHANCE) * overlappingMask
+    t('1.1.2')
+    #- This technique is faster than generating an entire random array the size
+    #- of the grid
+    stunnedCheck = np.random.random(overlappingNum) < STUN_CHANCE
+    stunnedMask = np.copy(overlappingMask)
+    stunnedMask[overlappingMask] = stunnedCheck
     predators[stunnedMask, 2] = STUN_TIME
+    t('1.1.3')
     #- Kills predators (predators both stunned and killed will die)
-    killChances = np.random.random((m, n))
-    killMask = (killChances < PREY_KILL_CHANCE) * overlappingMask
-    predators[killMask] = 0
+    killCheck = np.random.random(overlappingNum) < PREY_KILL_CHANCE
+    killMask = np.copy(overlappingMask)
+    killMask[overlappingMask] = killCheck
     predatorMask[killMask] = False
     #- Eats prey (if the predator was not stunned or killed)
+    t('1.1.4')
     eatMask = (overlappingMask * np.logical_not( \
         np.logical_or(stunnedMask, killMask)))
     prey[eatMask] = 0
     preyMask[eatMask] = False
     #- Gives predators that ate energy
+    t('1.1.5')
     predators[eatMask, 0] = np.where( \
         predators[eatMask, 0] + PREDATOR_EAT_ENERGY < PREDATOR_MAX_ENERGY,
         predators[eatMask, 0] + PREDATOR_EAT_ENERGY, PREDATOR_MAX_ENERGY)
     #- Grows plants that are not fully grown
+    t('1.1.6')
     growingPlantMask = plants > 0
     plants[growingPlantMask] -= 1
     #- Checks which plants overlap with prey and are fully grown
+    t('1.1.7')
     overlappingPlantMask = preyMask * plantMask
     grownOverlappingPlantMask = overlappingPlantMask * \
                                 np.logical_not(growingPlantMask)
     #- Resets eaten plants and gives prey energy from eating the plants
+    t('1.1.8')
     plants[grownOverlappingPlantMask] = PLANT_REGROWTH_TIME
     prey[grownOverlappingPlantMask, 0] = np.where( \
         prey[grownOverlappingPlantMask, 0] + PREY_EAT_ENERGY < PREY_MAX_ENERGY,
         prey[grownOverlappingPlantMask, 0] + PREY_EAT_ENERGY, PREY_MAX_ENERGY)
-    
+    t('1.1.9')
+
+#- Dictionary containing overall times for each action
+times = {}
+#- Tracks the previous timestamp when time was measured
+lastTime = time.time()
+
+def t(label):
+    """
+    Tracks the amount of time since this function was last called and adds it
+    to a dictionary. If the same label has been used before (for example,
+    through looping), then this time is added on to that.
+
+    Parameters
+    ----------
+    label : string
+        The label for this time, usually following 'x.y.z' format
+    """
+    global lastTime
+    curTime = time.time()
+    #- If this section has already been added to the dictionary:
+    if label in times:
+        times[label] += curTime - lastTime
+    #- Otherwise, add it to the dictionary:
+    else:
+        times[label] = curTime - lastTime
+    lastTime = curTime
+
+def printTimes():
+    """
+    Performs several operations on the values in the times dictionary and
+    prints them out.
+    First, converts each amount of time to a percentage of the total time used.
+    Also removes the X label from the dictionary, which represents anything
+    that could throw off the overall percentage (like visualization).
+    Next, rounds the values to a certain number of decimal places.
+    Finally, indents the lines to line up evenly.
+    """
+    #- The number of decimal places to round to
+    decimalPlaces = 5
+    #- This value is usually much larger than others and throws off the rest
+    if 'X' in times:
+        del times['X']
+    #- Max length of any label (used for indentation)
+    maxLength = 0
+    #- Used to calculate percentage
+    total = np.sum(np.array(list(times.values())))
+    #- Finds the maximum length of the labels
+    for name in times.keys():
+        if len(name) > maxLength:
+            maxLength = len(name)
+    for name, timeAmount in times.items():
+        #- Commented out code uses sig figs instead of decimal places
+        #magnitude = math.floor(math.log10(abs(timeAmount / total))) + 3
+        #value = round(timeAmount / total * 100, sigFigs - magnitude)
+        #- Converts values to a percentage and rounds them
+        value = round(timeAmount / total * 100, decimalPlaces)
+        indentation = maxLength - len(name)
+        indentationString = indentation * " "
+        #- Indents values below ten slightly more to align places
+        #- Don't have to worry about values above 100 because it's a percent
+        if value < 10:
+            indentationString += " "
+        print(f"{name}:{indentationString} {value}%")
+
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
-    runSimulation(True)
+    runSets()
