@@ -14,7 +14,6 @@ import random
 import pygame
 import matplotlib.pyplot as plt
 import time
-
 #--------------------------------- CONSTANTS ----------------------------------
 
 #- Number of sets of simulations run
@@ -22,13 +21,13 @@ SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 10
 #- Number of time steps in the simulation
-TIME_STEPS = 100
+TIME_STEPS = 1000
 #- Grid size
-m = 80 #- Vertical
-n = 80 #- Horizontal
+m = 150 #- Horizontal
+n = 100 #- Vertical
 #- The starting number of prey, predators, and plants
 PREY_START_NUM = 30
-PREDATOR_START_NUM = 10
+PREDATOR_START_NUM = 30
 PLANT_START_NUM = 10
 #- The energy that prey and predators start with
 PREY_START_ENERGY = 100
@@ -58,6 +57,25 @@ PREDATOR_COLOR = (255, 0, 0)
 #- Plant colors are interpolated between these two
 PLANT_GROWN_COLOR = (0, 255, 0)
 PLANT_UNGROWN_COLOR = (255, 255, 0)
+#- FPS of visualization
+FPS = 30
+
+#- Predator and Prey Eyesight values
+PREDATOR_EYESIGHT = 10
+PREY_EYESIGHT = 25
+#- Predator and Prey Movement Energy Costs
+PREDATOR_MOVE_ENERGY = 1
+PREY_MOVE_ENERGY = 1
+#- Predator and Prey Hungry Threshold Values
+PREDATOR_HUNGRY = 90
+PREY_HUNGRY = 90
+#- Predator and Prey Energy Gain Values
+PREDATOR_EAT_ENERGY = 10
+PREY_EAT_ENERGY = 10
+#- Range for Reproduction
+REPRODUCTION_RANGE = 10
+#- Can agents move diagonally? (affects distance calc)
+DIAGONAL_MOVEMENT = False
 
 def runSets():
     """
@@ -67,6 +85,7 @@ def runSets():
     preyPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
     predatorPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
     for i in range(SET_NUM):
+        print(f'Running...{i}', end='\r')
         preyPopulations[i], predatorPopulations[i] = runSet()
     print(
 f"""
@@ -121,19 +140,27 @@ def runSimulation(shouldVisualize = False):
         screen = initVisualization()
     t('X')
     for i in range(TIME_STEPS):
-        #- Runs a single feed cycle
-        t('1.1')
-        feed(prey, preyMask, predators, predatorMask, plants, plantMask)
-        t('1.2')
-        if shouldVisualize:
-            #- Visualizes the grid
-            if not visualize(screen, preyMask, predatorMask,
-                             plantMask, plants):
-                break
-        t('X')
-        preyPopulations[i] = np.count_nonzero(preyMask)
-        predatorPopulations[i] = np.count_nonzero(predatorMask)
-        t('1.4')
+        #- stop simulation if there are no prey or no predators alive
+        if np.any(preyMask) and np.any(predatorMask):
+            #- Runs a single feed cycle
+            t('1.1')
+            feed(prey, preyMask, predators, predatorMask, plants, plantMask)
+            t('1.2')
+            #- Runs a single move cycle
+            movePredators(preyMask, predators, predatorMask)
+            movePrey(prey, preyMask, predators, predatorMask, plants, plantMask)
+            if shouldVisualize:
+                screen.fill((255,255,255))
+                #- Visualizes the grid
+                if not visualize(screen, preyMask, predatorMask,
+                                plantMask, plants):
+                    break
+            t('X')
+            preyPopulations[i] = np.count_nonzero(preyMask)
+            predatorPopulations[i] = np.count_nonzero(predatorMask)
+            t('1.4')
+        else:
+            break
     if shouldVisualize:
         pygame.quit()
     return (preyPopulations, predatorPopulations)
@@ -244,6 +271,7 @@ def visualize(screen, preyMask, predatorMask, plantMask, plants):
     plantMask : 2d boolean array
         The locations that contain plants
     """
+    clock = pygame.time.Clock()
     #- Checks to see if the window has been closed
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -267,8 +295,9 @@ def visualize(screen, preyMask, predatorMask, plantMask, plants):
                     PLANT_REGROWTH_TIME + plantGrownColor * (1 -
                     (plants[i, j] / PLANT_REGROWTH_TIME))
                 pygame.draw.rect(screen, plantColor, rect)
-        #- Updates display
-        pygame.display.flip()
+    #- Updates display
+    pygame.display.flip()
+    clock.tick(FPS)
     return True
 
 def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
@@ -338,7 +367,152 @@ def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
         prey[grownOverlappingPlantMask, 0] + PREY_EAT_ENERGY < PREY_MAX_ENERGY,
         prey[grownOverlappingPlantMask, 0] + PREY_EAT_ENERGY, PREY_MAX_ENERGY)
     t('1.1.9')
+    
+def movePredators(preyMask, predators, predatorMask):
+    """
+    Represents one move cycle for predators
 
+    Parameters
+    -------
+    prey : 3d scalar array
+        First two dimension correspond to position, third dimension is energy
+        and time until possible reproduction.
+    preyMask : 2d boolean array
+        The locations that contain prey
+    predators : 3d scalar array
+        First two dimension correspond to position, third dimension is energy,
+        time until possible reproduction, and stun time
+    predatorMask : 2d boolean array
+        The locations that contain predators
+    plants : 2d scalar array
+        The time until plants will be regrown
+    plantMask : 2d boolean array
+        The locations that contain plants
+    """
+    #- Array of indices of predator and prey locations
+    predatorIndices = np.argwhere(predatorMask)  
+    preyIndices = np.argwhere(preyMask)
+    #- Find index of closest prey within eyesight for each predator
+    closestPrey = []
+    if DIAGONAL_MOVEMENT:
+        #- Euclidean distance
+        for x, y in predatorIndices:
+            #- Calculates distance to all prey from x,y coordinate of predator
+            distances = np.sqrt(np.sum((preyIndices-(x,y))**2, axis=1, keepdims=True))
+            #- mask distances array where the distance to a prey is greater than eyesight
+            distances = np.ma.masked_where(distances > PREDATOR_EYESIGHT, distances)
+            #- check if there is no prey within eyesight (true if the entire array is masked)
+            if np.all(distances.mask) or len(distances) == 0:
+                closestPrey.append([-1, -1])
+            else:
+                closestPreyIndex = np.argmin(distances)
+                #- (x,y) tuple found at each index in list corresponds to (x,y) found in predatorIndices at same index
+                #- so closestPreyList[a] corresponds to the closest prey for the predator found at predatorIndices[a]
+                closestPrey.append((preyIndices[closestPreyIndex,0], preyIndices[closestPreyIndex,1]))
+    else:
+        #- Manhattan distance
+        for x, y in predatorIndices:
+            #- Calculates distance to all prey from x,y coordinate of predator
+            distances = np.sum(np.abs(preyIndices-(x,y)), axis=1, keepdims=True)
+            #- mask distances array where the distance to a prey is greater than eyesight
+            distances = np.ma.masked_where(distances > PREDATOR_EYESIGHT, distances)
+            #- check if there is no prey within eyesight (true if the entire array is masked)
+            if np.all(distances.mask) or len(distances) == 0:
+                closestPrey.append([-1, -1])
+            else:
+                closestPreyIndex = np.argmin(distances)
+                #- (x,y) tuple found at each index in list corresponds to (x,y) found in predatorIndices at same index
+                #- so closestPreyList[a] corresponds to the closest prey for the predator found at predatorIndices[a]
+                closestPrey.append((preyIndices[closestPreyIndex,0], preyIndices[closestPreyIndex,1]))
+    closestPrey = np.asarray(closestPrey)
+    
+    #- set change in x direction to be towards x direction of closest prey
+    dx = np.where(closestPrey[:,0] < 0, np.random.choice([-1,0,1], len(predatorIndices)), \
+        np.where(closestPrey[:,0] > predatorIndices[:,0], 1, \
+            np.where(closestPrey[:,0] < predatorIndices[:,0], -1, 0)))
+    #- set change in y direction to be towards y direction of closest prey
+    dy = np.where(closestPrey[:,1] < 0, np.random.choice([-1,0,1], len(predatorIndices)), \
+        np.where(closestPrey[:,1] > predatorIndices[:,1], 1, \
+            np.where(closestPrey[:,1] < predatorIndices[:,1], -1, 0)))
+    if not DIAGONAL_MOVEMENT:
+        #- prioritize moving in x direction first (move in y once x coordinates line up)
+        dy = np.where(dx == 0, dy, 0)
+    
+    #- Update predator and predatorMask values for movement
+    for i in range(len(predatorIndices)):
+        #- if moving causes energy to equal or go below 0, predator dies
+        if (predators[predatorIndices[i,0], predatorIndices[i,1], 0] - PREDATOR_MOVE_ENERGY <= 0):
+                predators[predatorIndices[i,0], predatorIndices[i,1], 0] = 0
+                predatorMask[predatorIndices[i,0], predatorIndices[i,1]] = False
+                continue
+        #- check for going off both bottom and right side of screen
+        if predatorIndices[i,0] + dx[i] == m and predatorIndices[i,1] + dy[i] == n:
+            predators[0, 0, 0] = predators[predatorIndices[i,0], predatorIndices[i,1], 0] - PREDATOR_MOVE_ENERGY
+            predatorMask[0, 0] = True
+        #- check for going off right side of screen
+        elif predatorIndices[i,0] + dx[i] == m:
+            predators[0, predatorIndices[i,1] + dy[i], 0] = \
+                predators[predatorIndices[i,0], predatorIndices[i,1], 0] - PREDATOR_MOVE_ENERGY
+            predatorMask[0, predatorIndices[i,1] + dy[i]] = True    
+        #- check for going off bottom side of screen
+        elif predatorIndices[i,1] + dy[i] == n:
+            predators[predatorIndices[i,0] + dx[i], 0, 0] = \
+                predators[predatorIndices[i,0], predatorIndices[i,1], 0] - PREDATOR_MOVE_ENERGY
+            predatorMask[predatorIndices[i,0] + dx[i], 0] = True
+
+        #- check for predator not moving
+        elif dx[i] == 0 and dy[i] == 0:
+            continue
+        #- movement within bounds of screen
+        else:
+            predators[predatorIndices[i,0] + dx[i], predatorIndices[i,1] + dy[i], 0] = \
+                predators[predatorIndices[i,0], predatorIndices[i,1], 0] - PREDATOR_MOVE_ENERGY
+            predatorMask[predatorIndices[i,0] + dx[i], predatorIndices[i,1] + dy[i]] = True
+
+                
+        #- remove signs of predator in old location
+        predators[predatorIndices[i,0], predatorIndices[i,1], 0] = 0
+        predatorMask[predatorIndices[i,0], predatorIndices[i,1]] = False
+        
+def movePrey(prey, preyMask, predators, predatorMask, plants, plantMask):
+    pass
+
+def reproduce(prey, preyMask, predators, predatorMask):
+    #- Array of indices of predator and prey locations
+    predatorIndices = np.argwhere(predatorMask)  
+    preyIndices = np.argwhere(preyMask)
+    
+    closestPredator = []
+    if DIAGONAL_MOVEMENT:
+        #- Euclidean distance
+        for x, y in predatorIndices:
+            #- Calculates distance to all predators from x,y coordinate of predator
+            distances = np.sum((predatorIndices-(x,y)**2), axis=1, keepdims=True)
+            distances = np.ma.masked_where(distances > REPRODUCTION_RANGE, distances)
+            #- Gets indices for the closest prey and adds (x,y) tuple to list
+            closestPredatorIndex = np.argmin(distances)
+            #- (x,y) tuple found at each index in list corresponds to (x,y) found in predatorIndices at same index
+            #- so closestPreyList[a] corresponds to the closest prey for the predator found at predatorIndices[a]
+            closestPredator.append((predatorIndices[closestPredatorIndex,0], predatorIndices[closestPredatorIndex,1]))
+        closestPredator = np.asarray(closestPredator)
+    else:
+        #- Manhattan distance
+        for x, y in predatorIndices:
+            #- Calculates distance to all prey from x,y coordinate of predator
+            distances = np.sum(np.abs(predatorIndices-(x,y)), axis=1, keepdims=True)
+            #- mask distances array where the distance to a prey is greater than eyesight
+            distances = np.ma.masked_where(distances > REPRODUCTION_RANGE, distances)
+            #- check if there is no prey within eyesight (true if the entire array is masked)
+            if np.all(distances.mask) or len(distances) == 0:
+                closestPredator.append([-1, -1])
+            else:
+                closestPredatorIndex = np.argmin(distances)
+                #- (x,y) tuple found at each index in list corresponds to (x,y) found in predatorIndices at same index
+                #- so closestPreyList[a] corresponds to the closest prey for the predator found at predatorIndices[a]
+                closestPredator.append((predatorIndices[closestPredatorIndex,0], predatorIndices[closestPredatorIndex,1]))
+        closestPredator = np.asarray(closestPredator)
+    
+    
 #- Dictionary containing overall times for each action
 times = {}
 #- Tracks the previous timestamp when time was measured
@@ -405,3 +579,4 @@ def printTimes():
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
     runSets()
+
