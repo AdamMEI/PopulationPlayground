@@ -135,7 +135,7 @@ def runSimulation(shouldVisualize = False):
     preyPopulations = np.zeros(TIME_STEPS)
     predatorPopulations = np.zeros(TIME_STEPS)
     #- Initializes the program
-    prey, preyMask, predators, predatorMask, plants, plantMask = initialize()
+    prey, preyMask, predators, predatorMask, plants,  = initialize()
     if shouldVisualize:
         screen = initVisualization()
     t('X')
@@ -144,16 +144,16 @@ def runSimulation(shouldVisualize = False):
         if np.any(preyMask) and np.any(predatorMask):
             #- Runs a single feed cycle
             t('1.1')
-            feed(prey, preyMask, predators, predatorMask, plants, plantMask)
+            feed(prey, preyMask, predators, predatorMask, plants, )
             t('1.2')
             #- Runs a single move cycle
             movePredators(preyMask, predators, predatorMask)
-            movePrey(prey, preyMask, predators, predatorMask, plants, plantMask)
+            movePrey(prey, preyMask, predators, predatorMask, plants, )
             if shouldVisualize:
                 screen.fill((255,255,255))
                 #- Visualizes the grid
                 if not visualize(screen, preyMask, predatorMask,
-                                plantMask, plants):
+                                 plants):
                     break
             t('X')
             preyPopulations[i] = np.count_nonzero(preyMask)
@@ -184,7 +184,7 @@ def initialize():
         The locations that contain predators
     plants : 2d scalar array
         The time until plants will be regrown
-    plantMask : 2d boolean array
+     : 2d boolean array
         The locations that contain plants
     """
     #- Create arrays
@@ -192,8 +192,6 @@ def initialize():
     preyMask = np.zeros((m, n), dtype=bool)
     predators = np.zeros((m, n, 3))
     predatorMask = np.zeros((m, n), dtype=bool)
-    plantMask = np.zeros((m, n), dtype=bool)
-    plantCenterMask = np.zeros((m, n), dtype=bool)
     #- Create masks
     i = 0
     while i < PREY_START_NUM:
@@ -211,30 +209,15 @@ def initialize():
         if not predatorMask[y, x] and not preyMask[y, x]:
             predatorMask[y, x] = True
             i += 1
-    i = 0
-    while i < PLANT_START_NUM:
-        x = random.randint(2, n - 3)
-        y = random.randint(2, m - 3)
-        #- Ensures that there is not already a plant there (plants can still
-        #  overlap slightly because they are 3x3)
-        if not plantCenterMask[y, x]:
-            plantCenterMask[y, x] = True
-            i += 1
     #- Sets prey and predator start values
     prey[preyMask, 0] = PREY_START_ENERGY
     prey[preyMask, 1] = PREY_REPRODUCTION_START_TIME
     predators[predatorMask, 0] = PREDATOR_START_ENERGY
     predators[predatorMask, 1] = PREDATOR_REPRODUCTION_START_TIME
-    #- Adds other plants around the centers of the plants to make them 3x3
-    plantMask[1:-1, 1:-1] = np.array(plantCenterMask[0:-2,0:-2] + \
-        plantCenterMask[0:-2,1:-1] + plantCenterMask[0:-2,2:] + \
-        plantCenterMask[1:-1,0:-2] + plantCenterMask[1:-1,1:-1] + \
-        plantCenterMask[1:-1,2:] + plantCenterMask[2:,0:-2] + \
-        plantCenterMask[2:,1:-1] + plantCenterMask[2:,2:], bool)
     #- Initializes plants
-    plants = plantMask * PLANT_REGROWTH_TIME
+    plants = np.zeros((m, n))
     return (prey, preyMask, predators, predatorMask, \
-            plants, plantMask)
+            plants)
 
 def initVisualization():
     """
@@ -252,7 +235,7 @@ def initVisualization():
     screen.fill((255, 255, 255))
     return screen
 
-def visualize(screen, preyMask, predatorMask, plantMask, plants):
+def visualize(screen, preyMask, predatorMask, plants):
     """
     Visualizes the prey, predators, and plants using the constant colors and
     constant background color. Also uses PIXEL_SIZE and the grid size given by
@@ -268,7 +251,7 @@ def visualize(screen, preyMask, predatorMask, plantMask, plants):
         The locations that contain predators
     plants : 2d scalar array
         The time until plants will be regrown
-    plantMask : 2d boolean array
+     : 2d boolean array
         The locations that contain plants
     """
     clock = pygame.time.Clock()
@@ -286,7 +269,7 @@ def visualize(screen, preyMask, predatorMask, plantMask, plants):
                 pygame.draw.rect(screen, PREY_COLOR, rect)
             elif predatorMask[i, j]:
                 pygame.draw.rect(screen, PREDATOR_COLOR, rect)
-            elif plantMask[i, j]:
+            else:
                 plantUngrownColor = np.array(PLANT_UNGROWN_COLOR)
                 plantGrownColor = np.array(PLANT_GROWN_COLOR)
                 #- Interpolates color between plantUngrownColor and
@@ -300,7 +283,7 @@ def visualize(screen, preyMask, predatorMask, plantMask, plants):
     clock.tick(FPS)
     return True
 
-def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
+def feed(prey, preyMask, predators, predatorMask, plants, ):
     """
     Makes predators eat prey and prey eat plants. Prey also stun predators and
     kills them depending on constant chances. Finally, regrows plants.
@@ -319,7 +302,7 @@ def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
         The locations that contain predators
     plants : 2d scalar array
         The time until plants will be regrown
-    plantMask : 2d boolean array
+     : 2d boolean array
         The locations that contain plants
     """
     #- Mask of overlapping prey and predators
@@ -353,19 +336,15 @@ def feed(prey, preyMask, predators, predatorMask, plants, plantMask):
         predators[eatMask, 0] + PREDATOR_EAT_ENERGY, PREDATOR_MAX_ENERGY)
     #- Grows plants that are not fully grown
     t('1.1.6')
-    growingPlantMask = plants > 0
-    plants[growingPlantMask] -= 1
-    #- Checks which plants overlap with prey and are fully grown
-    t('1.1.7')
-    overlappingPlantMask = preyMask * plantMask
-    grownOverlappingPlantMask = overlappingPlantMask * \
-                                np.logical_not(growingPlantMask)
+    growing = plants > 0
+    plants[growing] -= 1
+    grownOverlapping = (~growing) * preyMask
     #- Resets eaten plants and gives prey energy from eating the plants
     t('1.1.8')
-    plants[grownOverlappingPlantMask] = PLANT_REGROWTH_TIME
-    prey[grownOverlappingPlantMask, 0] = np.where( \
-        prey[grownOverlappingPlantMask, 0] + PREY_EAT_ENERGY < PREY_MAX_ENERGY,
-        prey[grownOverlappingPlantMask, 0] + PREY_EAT_ENERGY, PREY_MAX_ENERGY)
+    plants[grownOverlapping] = PLANT_REGROWTH_TIME
+    prey[grownOverlapping, 0] = np.where( \
+        prey[grownOverlapping, 0] + PREY_EAT_ENERGY < PREY_MAX_ENERGY,
+        prey[grownOverlapping, 0] + PREY_EAT_ENERGY, PREY_MAX_ENERGY)
     t('1.1.9')
     
 def movePredators(preyMask, predators, predatorMask):
@@ -386,7 +365,7 @@ def movePredators(preyMask, predators, predatorMask):
         The locations that contain predators
     plants : 2d scalar array
         The time until plants will be regrown
-    plantMask : 2d boolean array
+     : 2d boolean array
         The locations that contain plants
     """
     #- Array of indices of predator and prey locations
@@ -474,7 +453,7 @@ def movePredators(preyMask, predators, predatorMask):
         predators[predatorIndices[i,0], predatorIndices[i,1], 0] = 0
         predatorMask[predatorIndices[i,0], predatorIndices[i,1]] = False
         
-def movePrey(prey, preyMask, predators, predatorMask, plants, plantMask):
+def movePrey(prey, preyMask, predators, predatorMask, plants):
     pass
 
 def reproduce(prey, preyMask, predators, predatorMask):
@@ -578,5 +557,5 @@ def printTimes():
 
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
-    runSets()
+    runSimulation(True)
 
