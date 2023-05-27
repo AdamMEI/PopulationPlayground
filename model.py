@@ -368,13 +368,13 @@ def feed(prey, preyMask, predators, predatorMask, plants):
     t('1.1.6')
     growing = plants > 0
     plants[growing] -= 1
-    grownOverlapping = (~growing) * preyMask
+    plantsEaten = (~growing) * preyMask * (prey[:, :, 0] < PREY_HUNGRY)
     #- Resets eaten plants and gives prey energy from eating the plants
     t('1.1.8')
-    plants[grownOverlapping] = PLANT_REGROWTH_TIME
-    prey[grownOverlapping, 0] = np.where( \
-        prey[grownOverlapping, 0] + PREY_EAT_ENERGY < PREY_MAX_ENERGY,
-        prey[grownOverlapping, 0] + PREY_EAT_ENERGY, PREY_MAX_ENERGY)
+    plants[plantsEaten] = PLANT_REGROWTH_TIME
+    prey[plantsEaten, 0] = np.where( \
+        prey[plantsEaten, 0] + PREY_EAT_ENERGY < PREY_MAX_ENERGY,
+        prey[plantsEaten, 0] + PREY_EAT_ENERGY, PREY_MAX_ENERGY)
     t('1.1.9')
     
 def movePredators(preyMask, predators, predatorMask):
