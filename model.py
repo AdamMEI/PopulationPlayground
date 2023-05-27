@@ -16,63 +16,91 @@ import matplotlib.pyplot as plt
 import time
 #--------------------------------- CONSTANTS ----------------------------------
 
+#- Simulation Constants
+#-----------------------
 #- Number of sets of simulations run
 SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 10
 #- Number of time steps in the simulation
 TIME_STEPS = 1000
+#- Can agents move diagonally? (affects distance calc)
+DIAGONAL_MOVEMENT = True
+#- Do agents reproduce asexually?
+ASEXUAL = True
+
+#- Display Constants
+#--------------------
 #- Grid size
-m = 100 #- Horizontal
-n = 100 #- Vertical
-#- The starting number of prey, predators, and plants
-PREY_START_NUM = 80
-PREDATOR_START_NUM = 50
-#- The energy that prey and predators start with
-PREY_START_ENERGY = 50
-PREDATOR_START_ENERGY = 100
-#- The amount of energy gained by prey and predators after eating
-PREY_EAT_ENERGY = 10
-PREDATOR_EAT_ENERGY = 50
-#- The maximum energy that prey and predators can have
-PREY_MAX_ENERGY = 100
-PREDATOR_MAX_ENERGY = 100
-#- The amount of time until prey and predators can reproduce for the first time
-PREY_REPRODUCTION_START_TIME = 30
-PREDATOR_REPRODUCTION_START_TIME = 2
-#- The time required for plants to regrow after being eaten
-PLANT_REGROWTH_TIME = 100
-#- The chance of prey fighting back and stunning or killing predators
-STUN_CHANCE = 0.5
-PREY_KILL_CHANCE = 0.01
-#- The amount of time that predators are stunned for after prey stun them
-STUN_TIME = 5
+WIDTH = 100 #- Horizontal
+HEIGHT = 100 #- Vertical
 #- The number of pixels for each grid location
-PIXEL_SIZE = 7
+PIXEL_SIZE = 8
+#- FPS of visualization
+FPS = 60
 #- The visualization colors
 BACKGROUND_COLOR = (255, 255, 255)
 PREY_COLOR = (0, 0, 255)
 PREDATOR_COLOR = (255, 0, 0)
+PREDATOR_STUN_COLOR = (100, 100, 100)
 #- Plant colors are interpolated between these two
 PLANT_GROWN_COLOR = (0, 255, 0)
 PLANT_UNGROWN_COLOR = (255, 255, 0)
-#- FPS of visualization
-FPS = 60
 
-#- Predator and Prey Eyesight values
+#- Predator Constants
+#---------------------
+#- Starting Number of Agents
+PREDATOR_START_NUM = 50
+#- Starting Energy Value
+PREDATOR_START_ENERGY = 100
+#- Energy Gain by Eating 
+PREDATOR_EAT_ENERGY = 50
+#- Maximum Energy Value
+PREDATOR_MAX_ENERGY = 100
+#- Reproduction Timer (How many cycles between possible reproductions)
+PREDATOR_REPRODUCTION_START_TIME = 5
+#- Eyesight Radius
 PREDATOR_EYESIGHT = 20
+#- Energy Spent in Single Move Cycle
+PREDATOR_MOVE_ENERGY = 2
+#- Number of Cycles stunned
+STUN_TIME = 5
+#- Radius that another predator has to be in for reproduction to occure
+PREDATOR_REPRODUCTION_RANGE = 5
+#- Energy threshold for reproduction
+PREDATOR_REPRODUCTION_THRESHOLD = 80
+
+#- Prey Constants
+#-----------------
+#- Starting Number of Agents
+PREY_START_NUM = 80
+#- Starting Energy Value
+PREY_START_ENERGY = 50
+#- Energy Gain by Eating 
+PREY_EAT_ENERGY = 10
+#- Maximum Energy Value
+PREY_MAX_ENERGY = 100
+#- Reproduction Timer (How many cycles between possible reproductions)
+PREY_REPRODUCTION_START_TIME = 30
+#- Eyesight Radius
 PREY_EYESIGHT = 10
-#- Predator and Prey Movement Energy Costs
-PREDATOR_MOVE_ENERGY = 1
+#- Energy Spent in Single Move Cycle
 PREY_MOVE_ENERGY = 1
-#- Predator and Prey Hungry Threshold Values
-PREDATOR_HUNGRY = 90
+#- Energy Threshold for Eating
 PREY_HUNGRY = 90
-#- Range and energy threshold for Reproduction
-REPRODUCTION_RANGE = 5
-REPRODUCTION_THRESHOLD = 80
-#- Can agents move diagonally? (affects distance calc)
-DIAGONAL_MOVEMENT = True
+#- Percent chance of stunning predators
+STUN_CHANCE = 0.5
+#- Percent chance of killing predators
+PREY_KILL_CHANCE = 0.01
+#- Radius that another prey has to be in for reproduction to occure
+PREY_REPRODUCTION_RANGE = 5
+#- Energy threshold for reproduction
+PREY_REPRODUCTION_THRESHOLD = 80
+
+#- Plant Constants
+#------------------
+#- The time required for plants to regrow after being eaten
+PLANT_REGROWTH_TIME = 100
 
 def runSets():
     """
@@ -142,7 +170,7 @@ def runSimulation(shouldVisualize = False):
             if shouldVisualize:
                 screen.fill((255,255,255))
                 #- Visualizes the grid
-                if not visualize(screen, preyMask, predatorMask,
+                if not visualize(screen, preyMask, predators, predatorMask,
                                  plants):
                     break
             t('X')
@@ -152,7 +180,7 @@ def runSimulation(shouldVisualize = False):
             t('1.2')
             #- Runs a single move cycle
             movePredators(preyMask, predators, predatorMask)
-            movePrey(prey, preyMask, predators, predatorMask, plants)
+            movePrey(prey, preyMask, predatorMask, plants)
             reproduce(prey, preyMask, predators, predatorMask)
             
             preyPopulations[i] = np.count_nonzero(preyMask)
@@ -187,23 +215,23 @@ def initialize():
         The locations that contain plants
     """
     #- Create arrays
-    prey = np.zeros((m, n, 2))
-    preyMask = np.zeros((m, n), dtype=bool)
-    predators = np.zeros((m, n, 3))
-    predatorMask = np.zeros((m, n), dtype=bool)
+    prey = np.zeros((WIDTH, HEIGHT, 2))
+    preyMask = np.zeros((WIDTH, HEIGHT), dtype=bool)
+    predators = np.zeros((WIDTH, HEIGHT, 3))
+    predatorMask = np.zeros((WIDTH, HEIGHT), dtype=bool)
     #- Create masks
     i = 0
     while i < PREY_START_NUM:
-        x = random.randint(1, n - 2)
-        y = random.randint(1, m - 2)
+        x = random.randint(1, HEIGHT - 2)
+        y = random.randint(1, WIDTH - 2)
         #- Ensure that there is not already a prey there
         if not preyMask[y, x]:
             preyMask[y, x] = True
             i += 1
     i = 0
     while i < PREDATOR_START_NUM:
-        x = random.randint(1, n - 2)
-        y = random.randint(1, m - 2)
+        x = random.randint(1, HEIGHT - 2)
+        y = random.randint(1, WIDTH - 2)
         #- Ensure that there is not already a prey or predator there
         if not predatorMask[y, x] and not preyMask[y, x]:
             predatorMask[y, x] = True
@@ -214,7 +242,7 @@ def initialize():
     predators[predatorMask, 0] = PREDATOR_START_ENERGY
     predators[predatorMask, 1] = PREDATOR_REPRODUCTION_START_TIME
     #- Initializes plants
-    plants = np.zeros((m, n))
+    plants = np.zeros((WIDTH, HEIGHT))
     return (prey, preyMask, predators, predatorMask, \
             plants)
 
@@ -229,16 +257,16 @@ def initVisualization():
     """
     #- Begins the visualization
     pygame.init()
-    screen = pygame.display.set_mode([m * PIXEL_SIZE, n * PIXEL_SIZE])
+    screen = pygame.display.set_mode([WIDTH * PIXEL_SIZE, HEIGHT * PIXEL_SIZE])
     #- Sets background color
     screen.fill((255, 255, 255))
     return screen
 
-def visualize(screen, preyMask, predatorMask, plants):
+def visualize(screen, preyMask, predators, predatorMask, plants):
     """
     Visualizes the prey, predators, and plants using the constant colors and
     constant background color. Also uses PIXEL_SIZE and the grid size given by
-    m and n.
+    WIDTH and HEIGHT.
 
     Parameters
     ----------
@@ -259,15 +287,18 @@ def visualize(screen, preyMask, predatorMask, plants):
         if event.type == pygame.QUIT:
             return False
     #- Iterates through grid
-    for i in range(m):
-        for j in range(n):
+    for i in range(WIDTH):
+        for j in range(HEIGHT):
             #- Draws a rectangle for each prey, predator, and plant
             rect = pygame.Rect(i * PIXEL_SIZE, j * PIXEL_SIZE,
                                PIXEL_SIZE, PIXEL_SIZE)
             if preyMask[i, j]:
                 pygame.draw.rect(screen, PREY_COLOR, rect)
             elif predatorMask[i, j]:
-                pygame.draw.rect(screen, PREDATOR_COLOR, rect)
+                if predators[i,j, 2] > 0:
+                    pygame.draw.rect(screen, PREDATOR_STUN_COLOR, rect)
+                else:    
+                    pygame.draw.rect(screen, PREDATOR_COLOR, rect)
             else:
                 plantUngrownColor = np.array(PLANT_UNGROWN_COLOR)
                 plantGrownColor = np.array(PLANT_GROWN_COLOR)
@@ -352,9 +383,6 @@ def movePredators(preyMask, predators, predatorMask):
 
     Parameters
     -------
-    prey : 3d scalar array
-        First two dimension correspond to position, third dimension is energy
-        and time until possible reproduction.
     preyMask : 2d boolean array
         The locations that contain prey
     predators : 3d scalar array
@@ -362,22 +390,20 @@ def movePredators(preyMask, predators, predatorMask):
         time until possible reproduction, and stun time
     predatorMask : 2d boolean array
         The locations that contain predators
-    plants : 2d scalar array
-        The time until plants will be regrown
-     : 2d boolean array
-        The locations that contain plants
     """
-    #- Array of indices of predator and prey locations
+    #- Array of indices of predator locations in predatorMask
     predatorIndices = np.argwhere(predatorMask)  
-    #- Find index of closest prey within eyesight for each predator
+    #- lists for keeping track of changes in x and y for each predator
     dx = []
     dy = []
+    #- loop through all predators
     for i in range(len(predatorIndices)):
         #- (x, y) coordinate of predator in predatorMask
         x, y = predatorIndices[i,0], predatorIndices[i,1]
+
         #- eyesightArray gives us an array with (x,y) as the center and a radius of predator eyesight
         #- eyesight will contain any indices of prey within the eyesightArray
-        eyesight = np.argwhere(eyesightArray(preyMask, x, y, PREDATOR_EYESIGHT*2+1))  
+        eyesight = np.argwhere(eyesightArray(preyMask, x, y, PREDATOR_EYESIGHT))  
         #- center of eyesightArray is located at (eyesight, eyesight)
         center = (PREDATOR_EYESIGHT, PREDATOR_EYESIGHT)
         #- Calculates relative distance to all prey within eyesight from x,y coordinate of predator
@@ -387,13 +413,20 @@ def movePredators(preyMask, predators, predatorMask):
         else:
             #- Manhattan distance
             distances = np.sum(np.abs(eyesight-center), axis=1)
-        #- check if there is no prey within eyesight (true if the entire array is masked)
+        #- no prey within eyesight
         if len(distances) == 0:
+            #- random movement in x and y direction
             dx.append(np.random.choice([-1,0,1]))
             dy.append(np.random.choice([-1,0,1]))
+        #- atleast 1 prey within eyesight
         else:
-            closestPreyIndex = np.argmin(distances)
+            #- Index of closest prey(s)
+            closestPreyIndex = np.where(distances == distances.min())
+            #- Randomly choose closest prey if there is more than one option
+            if len(closestPreyIndex[0]) > 1: closestPreyIndex = np.random.choice(closestPreyIndex[0])
+            #- Predators have a chance to move one extra space
             boost = np.random.binomial(1,0.25)
+            #- Move towards the closest prey in both x and y direction
             if eyesight[closestPreyIndex,0] > center[0]: dx.append(1+boost)
             elif eyesight[closestPreyIndex,0] < center[0]: dx.append(-1-boost)
             else: dx.append(0)
@@ -404,64 +437,103 @@ def movePredators(preyMask, predators, predatorMask):
     dy = np.asarray(dy)
 
     if not DIAGONAL_MOVEMENT:
-        #- prioritize moving in x direction first (move in y once x coordinates line up)
-        dy = np.where(dx == 0, dy, 0)
+        #- randomly choose either x or y direction to move in, but not both
+        if np.random.random() < 0.5:
+            dy = np.where(dx == 0, dy, 0)
+        else:
+            dx = np.where(dy == 0, dx, 0)
+            
     
-    #- Update predator and predatorMask values for movement
+    #- Movement validation for boundary checks and process movement in arrays
+    #- Loop through all predators
     for i in range(len(predatorIndices)):
+        #- x, y indices of current predator in predators array
         x, y = predatorIndices[i,0], predatorIndices[i,1]
+        #- check if current predator is stunned
+        if predators[x,y,2] > 0:
+            predators[x,y,2] -= 1
+            continue
         #- if moving causes energy to equal or go below 0, predator dies
         if (predators[x, y, 0] - PREDATOR_MOVE_ENERGY <= 0):
                 predators[x, y, 0] = 0
                 predatorMask[x, y] = False
                 continue
+        #- get neighbors
         neighbors = getNeighbors(x,y,predatorMask)
-        if len(neighbors) < 7:
-            moveRandom(x,y,predators, predatorMask)
+        #- neighbors < 8 when there is another predator as a neighbor
+        if len(neighbors) < 8:
+            #- move randomly to one of the empty neighbors
+            nx, ny = neighbors[np.random.choice(len(neighbors))]
+            predators[nx, ny, 0] = \
+                predators[x, y, 0] - PREDATOR_MOVE_ENERGY
+            predators[nx, ny, 1] = predators[x, y, 1]
+            predatorMask[nx, ny] = True
         #- check for going off both bottom and right side of screen
-        elif x + dx[i] >= m and y + dy[i] >= n:
+        elif x + dx[i] >= WIDTH and y + dy[i] >= HEIGHT:
             predators[0, 0, 0] = predators[x, y, 0] - PREDATOR_MOVE_ENERGY
             predators[0, 0, 1] = predators[x, y, 1]
             predatorMask[0, 0] = True
         #- check for going off right side of screen
-        elif x + dx[i] >= m:
+        elif x + dx[i] >= WIDTH:
             predators[0, y + dy[i], 0] = \
                 predators[x, y, 0] - PREDATOR_MOVE_ENERGY
             predators[0, y + dy[i], 1] = predators[x, y, 1]
             predatorMask[0, y + dy[i]] = True    
         #- check for going off bottom side of screen
-        elif y + dy[i] >= n:
+        elif y + dy[i] >= HEIGHT:
             predators[x + dx[i], 0, 0] = \
                 predators[x, y, 0] - PREDATOR_MOVE_ENERGY
             predators[x + dx[i], 0, 1] = predators[x, y, 1]
             predatorMask[x + dx[i], 0] = True
         #- movement within bounds of screen
         else:
-            predators[predatorIndices[i,0] + dx[i], predatorIndices[i,1] + dy[i], 0] = \
-                predators[predatorIndices[i,0], predatorIndices[i,1], 0] - PREDATOR_MOVE_ENERGY
-            predators[predatorIndices[i,0] + dx[i], predatorIndices[i,1] + dy[i], 1] = predators[predatorIndices[i,0], predatorIndices[i,1], 1]
-            predatorMask[predatorIndices[i,0] + dx[i], predatorIndices[i,1] + dy[i]] = True
+            predators[x + dx[i], y + dy[i], 0] = \
+                predators[x, y, 0] - PREDATOR_MOVE_ENERGY
+            predators[x + dx[i], y + dy[i], 1] = predators[x, y, 1]
+            predatorMask[x + dx[i], y + dy[i]] = True
                 
         #- remove signs of predator in old location
-        predators[predatorIndices[i,0], predatorIndices[i,1], 0] = \
-            predators[predatorIndices[i,0], predatorIndices[i,1], 1] = 0
-        predatorMask[predatorIndices[i,0], predatorIndices[i,1]] = False
+        predators[x, y, 0] = predators[x, y, 1] = 0
+        predatorMask[x, y] = False
         
-def movePrey(prey, preyMask, predators, predatorMask, plants):
-    #- Array of indices of predator, prey, and plant locations
+def movePrey(prey, preyMask, predatorMask, plants):
+    """
+    Represents one move cycle for prey
+    Prey behavior priorities is as follows:
+        1. Avoid predators within eyesight
+        2. Path towards closest plant cell if hungry
+        3. Move in a random direction
+
+    Parameters
+    -------
+    prey : 3d scalar array
+        First two dimension correspond to position, third dimension is energy
+        and time until possible reproduction.
+    preyMask : 2d boolean array
+        The locations that contain prey
+    predatorMask : 2d boolean array
+        The locations that contain predators
+    plants : 2d scalar array
+        The locations that contain plants
+        The time until plants will be regrown
+    """
+    #- Array of indices of prey locations
     preyIndices = np.argwhere(preyMask)
+    #- lists for keeping track of changes in x and y for each prey
     dx = []
     dy = []
+    #- loop through all prey
     for i in range(len(preyIndices)):
-        #- (x, y) coordinate of predator in predatorMask
+        #- (x, y) coordinate of prey in preyMask
         x, y = preyIndices[i,0], preyIndices[i,1]
-        #- eyesightArray gives us an array with (x,y) as the center and a radius of predator eyesight
-        #- eyesight will contain any indices of prey within the eyesightArray
-        plantEyesight = np.transpose(np.where(eyesightArray(plants, x, y, PREY_EYESIGHT*2+1) == 0))  
-        predatorEyesight = np.argwhere(eyesightArray(predatorMask,x,y,PREY_EYESIGHT*2+1))  
+        #- eyesightArray gives us an array with (x,y) as the center and a radius of prey eyesight
+        #- plantEyesight will contain any indices of plants within the eyesightArray
+        #- predatorEyesight will contain any indices of predators within the eyesightArray
+        plantEyesight = np.transpose(np.where(eyesightArray(plants, x, y, PREY_EYESIGHT) == 0))  
+        predatorEyesight = np.argwhere(eyesightArray(predatorMask,x,y,PREY_EYESIGHT))  
         #- center of eyesightArray is located at (eyesight, eyesight)
         center = (PREY_EYESIGHT, PREY_EYESIGHT)
-        #- Calculates relative distance to all predator from x,y coordinate of prey
+        #- Calculates relative distance to all predators and plants from x,y coordinate of prey
         if DIAGONAL_MOVEMENT:
             #- Euclidean distance
             predDistances = np.floor(np.sqrt(np.sum((predatorEyesight-center)**2, axis=1)))
@@ -470,23 +542,35 @@ def movePrey(prey, preyMask, predators, predatorMask, plants):
             #- Manhattan distance
             predDistances = np.sum(np.abs(predatorEyesight-center), axis=1)
             plantDistances = np.sum(np.abs(plantEyesight-center), axis=1)
-
+        #- no predators within eyesight
         if len(predDistances) == 0:
-            if len(plantDistances) == 0:
+            #- no plants within eyesight or prey is not hungry
+            if len(plantDistances) == 0 or prey[x,y,0] < PREY_HUNGRY:
+                #- random movement in x and y direction
                 dx.append(np.random.choice([-1,0,1]))
                 dy.append(np.random.choice([-1,0,1]))
+            #- atleast 1 plant within eyesight
             else:
+                #- Index of closest plant(s)
                 closestPlantIndex = np.where(plantDistances == plantDistances.min())
+                #- Randomly choose closest plant if there is more than one option
                 if len(closestPlantIndex[0]) > 1: closestPlantIndex = np.random.choice(closestPlantIndex[0])
                 else: closestPlantIndex = closestPlantIndex[0][0]
+                #- Move towards closest plant in both x and y direction
                 if plantEyesight[closestPlantIndex,0] > center[0]: dx.append(1)
                 elif plantEyesight[closestPlantIndex,0] < center[0]: dx.append(-1)
                 else: dx.append(0)
                 if plantEyesight[closestPlantIndex,1] > center[1]: dy.append(1)
                 elif plantEyesight[closestPlantIndex,1] < center[1]: dy.append(-1)
                 else: dy.append(1)
+        #- atleast 1 predator within eyesight
         else:
-            closestPredatorIndex = np.argmin(predDistances)
+            #- Index of closest predator(s)
+            closestPredatorIndex = np.where(predDistances == predDistances.min())
+            #- Randomly choose closest predator if there is more than one option
+            if len(closestPredatorIndex[0]) > 1: closestPredatorIndex = np.random.choice(closestPredatorIndex[0])
+            #- Move towards closest predator in both x and y direction
+            else: closestPredatorIndex = closestPredatorIndex[0][0]
             if predatorEyesight[closestPredatorIndex,0] > center[0]: dx.append(-1)
             elif predatorEyesight[closestPredatorIndex,0] < center[0]: dx.append(1)
             else: dx.append(0)
@@ -501,29 +585,38 @@ def movePrey(prey, preyMask, predators, predatorMask, plants):
         dy = np.where(dx == 0, dy, 0)
     
     #- movement validation for boundary checks and process movement in arrays
+    #- Loop through all prey
     for i in range(len(preyIndices)):
+        #- x, y indices of current prey in prey array
         x, y = preyIndices[i,0], preyIndices[i,1]
         #- if moving causes energy to equal or go below 0, prey dies
         if (prey[x, y, 0] - PREY_MOVE_ENERGY <= 0):
                 prey[x, y, 0] = 0
                 preyMask[x, y] = False
                 continue
+        #- get neighbors
         neighbors = getNeighbors(x,y,preyMask)
-        if len(neighbors) < 7:
-            moveRandom(x,y,prey, preyMask)
+        #- neighbors < 8 when there is another prey as a neighbor
+        if len(neighbors) < 8:
+            #- move randomly to one of the empty neighbors
+            nx, ny = neighbors[np.random.choice(len(neighbors))]
+            prey[nx, ny, 0] = \
+                prey[x, y, 0] - PREY_MOVE_ENERGY
+            prey[nx, ny, 1] = prey[x, y, 1]
+            preyMask[nx, ny] = True
         #- check for going off both bottom and right side of screen
-        elif x + dx[i] >= m and y + dy[i] >= n:
+        elif x + dx[i] >= WIDTH and y + dy[i] >= HEIGHT:
             prey[0, 0, 0] = prey[x, y, 0] - PREY_MOVE_ENERGY
             prey[0, 0, 1] = prey[x, y, 1]
             preyMask[0, 0] = True
         #- check for going off right side of screen
-        elif x + dx[i] >= m:
+        elif x + dx[i] >= WIDTH:
             prey[0, y + dy[i], 0] = \
                 prey[x, y, 0] - PREY_MOVE_ENERGY
             prey[0, y + dy[i], 1] = prey[x, y, 1]
             preyMask[0, y + dy[i]] = True    
         #- check for going off bottom side of screen
-        elif y + dy[i] >= n:
+        elif y + dy[i] >= HEIGHT:
             prey[x + dx[i], 0, 0] = \
                 prey[x, y, 0] - PREY_MOVE_ENERGY
             prey[x + dx[i], 0, 1] = prey[x, y, 1]
@@ -536,88 +629,170 @@ def movePrey(prey, preyMask, predators, predatorMask, plants):
             preyMask[x + dx[i], y + dy[i]] = True
             
         #- remove signs of prey in old location
-        prey[preyIndices[i,0], preyIndices[i,1], 0] = 0
-        preyMask[preyIndices[i,0], preyIndices[i,1]] = False
+        prey[x, y, 0] = prey[x, y, 1] = 0
+        preyMask[x, y] = False
         
-def moveRandom(x, y, data, mask):
-    neighbors = getNeighbors(x, y)
-    randomNeighbor = neighbors[np.random.choice(len(neighbors))]
-    data[randomNeighbor, 0] = \
-        data[x, y, 0] - PREY_MOVE_ENERGY
-    data[randomNeighbor, 1] = data[x, y, 1]
-    mask[randomNeighbor] = True
+def eyesightArray(a, x, y, HEIGHT):
+    """
+    Given an array a, returns an array with radius HEIGHT with center element a[x,y]
+    This is used to assist in consistent calculations across periodic boundary
+    conditions
+     
+    Source: https://stackoverflow.com/questions/4148292/how-do-i-select-a-window-from-a-numpy-array-with-periodic-boundary-conditions
+    
+    Parameters
+    -------
+    a : array-like
+    x : int
+        x index in array a
+    y : int 
+        y index in array a
+    HEIGHT : int
+        radius of desired array
         
-def eyesightArray(a, x, y, n):
-    ''' Given a 2D-array, returns an nxn array whose "center" element is arr[x,y]'''
-    a=np.roll(np.roll(a,shift=-x+int(n/2),axis=0),shift=-y+int(n/2),axis=1)
-    return a[:n,:n]
-
+    Returns
+    -------
+    Subarray of input array with radius HEIGHT with center element a[x,y] 
+    """
+    HEIGHT = (HEIGHT*2) + 1
+    a=np.roll(np.roll(a,shift=-x+int(HEIGHT/2),axis=0),shift=-y+int(HEIGHT/2),axis=1)
+    return a[:HEIGHT,:HEIGHT]
+    
 def reproduce(prey, preyMask, predators, predatorMask):
+    """
+    Represents one reproduction cycle for both predators and prey
+    If ASEXUAL reproduction is allowed, then reproduction will occur
+    without any check for nearby similar agents, otherwise agents will 
+    check for similar agents within their reproduction range.
+
+    Parameters
+    -------
+    prey : 3d scalar array
+        First two dimension correspond to position, third dimension is energy
+        and time until possible reproduction.
+    preyMask : 2d boolean array
+        The locations that contain prey
+    predatorMask : 2d boolean array
+        The locations that contain predators
+    plants : 2d scalar array
+        The locations that contain plants
+        The time until plants will be regrown
+    """
     #- Array of indices of predator locations
     predatorIndices = np.argwhere(predatorMask)  
+    #- Loop through all predators
     for i in range(len(predatorIndices)):
+        #- similar agents in range flag
+        inRange = True
+        #- x,y indices of current predator in predators array
         x, y = predatorIndices[i,0], predatorIndices[i,1]
-        eyesight = np.argwhere(eyesightArray(predatorMask, x, y, REPRODUCTION_RANGE*2+1))  
-        center = (REPRODUCTION_RANGE, REPRODUCTION_RANGE)
-        if DIAGONAL_MOVEMENT:
-            #- Euclidean distance
-            distances = np.sqrt(np.sum((eyesight-center)**2, axis=1))
-        else:
-            #- Manhattan distance
-            distances = np.sum(np.abs(eyesight-center), axis=1)
-        if predators[x,y,0] < REPRODUCTION_THRESHOLD or predators[x,y,1] > 0:
+        #- eyesightArray gives us an array with (x,y) as the center and a radius of predator eyesight
+        #- eyesight will contain any indices of predators within the eyesightArray
+        eyesight = np.argwhere(eyesightArray(predatorMask, x, y, PREDATOR_REPRODUCTION_RANGE))  
+        #- center of eyesightArray is located at (eyesight, eyesight)
+        center = (PREDATOR_REPRODUCTION_RANGE, PREDATOR_REPRODUCTION_RANGE)
+        #- similar agents required within range for reproduction to happen
+        if not ASEXUAL:
+            if DIAGONAL_MOVEMENT:
+                #- Euclidean distance
+                distances = np.sqrt(np.sum((eyesight-center)**2, axis=1))
+            else:
+                #- Manhattan distance
+                distances = np.sum(np.abs(eyesight-center), axis=1)
+            #- True when asexual reproduction, false when no similar agents within range
+            inRange = not len(distances) == 0
+            
+        #- no similar agents within range or energy is less than threshold or agent has reproduced recently
+        if not inRange or predators[x,y,0] < PREDATOR_REPRODUCTION_THRESHOLD or predators[x,y,1] > 0:
+            #- decrease reproduction timer
             predators[x,y,1] -= 1
             continue
         else:
             #- get list of neighbor cells (x, y) coordinates to current predator
             neighbors = getNeighbors(x, y, predatorMask)
+            #- randomly pick a valid neighbor and spawn new agent there
             newx, newy = neighbors[np.random.choice(len(neighbors))]
             predatorMask[newx, newy] = True
             predators[newx, newy, 0] = PREDATOR_START_ENERGY
             predators[newx, newy, 1] = PREDATOR_REPRODUCTION_START_TIME
             predators[x,y,1] = PREDATOR_REPRODUCTION_START_TIME
                 
+    #- Array of indices of prey locations
     preyIndices = np.argwhere(preyMask)
+    #- Loop through all prey
     for i in range(len(preyIndices)):
+        #- similar agents in range flag
+        inRange = True
+        #- x,y indices of current predator in predators array
         x, y = preyIndices[i,0], preyIndices[i,1]
-        eyesight = np.argwhere(eyesightArray(preyMask, x, y, REPRODUCTION_RANGE*2+1))  
-        center = (REPRODUCTION_RANGE, REPRODUCTION_RANGE)
-        if DIAGONAL_MOVEMENT:
-            #- Euclidean distance
-            distances = np.sqrt(np.sum((eyesight-center)**2, axis=1))
-        else:
-            #- Manhattan distance
-            distances = np.sum(np.abs(eyesight-center), axis=1)
-        if prey[x,y,0] < REPRODUCTION_THRESHOLD or prey[x,y,1] > 0:
+        #- eyesightArray gives us an array with (x,y) as the center and a radius of prey eyesight
+        #- eyesight will contain any indices of prey within the eyesightArray
+        eyesight = np.argwhere(eyesightArray(preyMask, x, y, PREY_REPRODUCTION_RANGE))  
+        #- center of eyesightArray is located at (eyesight, eyesight)
+        center = (PREY_REPRODUCTION_RANGE, PREY_REPRODUCTION_RANGE)
+        #- similar agents required within range for reproduction to happen
+        if not ASEXUAL:
+            if DIAGONAL_MOVEMENT:
+                #- Euclidean distance
+                distances = np.sqrt(np.sum((eyesight-center)**2, axis=1))
+            else:
+                #- Manhattan distance
+                distances = np.sum(np.abs(eyesight-center), axis=1)
+            #- True when asexual reproduction, false when no similar agents within range
+            inRange = not len(distances) == 0
+            
+        #- no similar agents within range or energy is less than threshold or agent has reproduced recently
+        if not inRange or prey[x,y,0] < PREY_REPRODUCTION_THRESHOLD or prey[x,y,1] > 0:
+            #- decrease reproduction timer
             prey[x,y,1] -= 1
             continue
         else:
             #- get list of neighbor cells (x, y) coordinates to current prey
             neighbors = getNeighbors(x, y, preyMask)
-            if len(neighbors) > 0:
-                newx, newy = neighbors[np.random.choice(np.arange(len(neighbors)))]
-                preyMask[newx, newy] = True
-                prey[newx, newy, 0] = PREDATOR_START_ENERGY
-                prey[newx, newy, 1] = PREY_REPRODUCTION_START_TIME
-                prey[x,y,1] = PREY_REPRODUCTION_START_TIME
+            #- randomly pick a valid neighbor and spawn new agent there
+            newx, newy = neighbors[np.random.choice(np.arange(len(neighbors)))]
+            preyMask[newx, newy] = True
+            prey[newx, newy, 0] = PREDATOR_START_ENERGY
+            prey[newx, newy, 1] = PREY_REPRODUCTION_START_TIME
+            prey[x,y,1] = PREY_REPRODUCTION_START_TIME
 
 def getNeighbors(x, y, mask=None):
+    """
+    Returns a list of indice tuples for neighboring cells of (x,y), optionally 
+    can be provided a mask to remove occupied neighboring cells from the returned list
+    
+    Parameters
+    -------
+    x : int
+        x indice in an array
+    y : int 
+        y indice in an array
+    mask : boolean array
+        mask to check for occupied neighbors
+        
+    Returns
+    -------
+    list of indice tuples
+    """
     #- get list of neighbor cells (x, y) coordinates to current predator
     neighbors = [(x-1, y-1),(x, y-1),(x+1, y-1),(x-1, y),(x+1, y),(x-1, y+1),(x, y+1),(x+1, y+1)]
+    #- loop through neighbors to adjust values for boundary conditions
     for i in range(len(neighbors)):
         #- check for going off both bottom and right side of screen
-        if neighbors[i][0] == m and neighbors[i][1] == n:
+        if neighbors[i][0] == WIDTH and neighbors[i][1] == HEIGHT:
             neighbors[i] = (0, 0)
         #- check for going off right side of screen
-        elif neighbors[i][0] == m:
+        elif neighbors[i][0] == WIDTH:
             neighbors[i] = (0, neighbors[i][1])
         #- check for going off bottom side of screen
-        elif neighbors[i][1] == n:
+        elif neighbors[i][1] == HEIGHT:
             neighbors[i] = (neighbors[i][0], 0)
+    #- checks mask against neighbors and removes occupied neighbor cells
     if mask is not None:
         for neighbor in neighbors:
             if mask[neighbor[0],neighbor[1]]:
                 neighbors.remove(neighbor)
+    #- if no valid neighbors, return original cell as only valid location
     if len(neighbors) == 0:
         return [(x,y)]
     return neighbors
