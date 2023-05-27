@@ -632,9 +632,9 @@ def movePrey(prey, preyMask, predatorMask, plants):
         prey[x, y, 0] = prey[x, y, 1] = 0
         preyMask[x, y] = False
         
-def eyesightArray(a, x, y, HEIGHT):
+def eyesightArray(a, x, y, n):
     """
-    Given an array a, returns an array with radius HEIGHT with center element a[x,y]
+    Given an array a, returns an array with radius n with center element a[x,y]
     This is used to assist in consistent calculations across periodic boundary
     conditions
      
@@ -647,16 +647,16 @@ def eyesightArray(a, x, y, HEIGHT):
         x index in array a
     y : int 
         y index in array a
-    HEIGHT : int
+    n : int
         radius of desired array
         
     Returns
     -------
-    Subarray of input array with radius HEIGHT with center element a[x,y] 
+    Subarray of input array with radius n with center element a[x,y] 
     """
-    HEIGHT = (HEIGHT*2) + 1
-    a=np.roll(np.roll(a,shift=-x+int(HEIGHT/2),axis=0),shift=-y+int(HEIGHT/2),axis=1)
-    return a[:HEIGHT,:HEIGHT]
+    n = (n*2) + 1
+    a=np.roll(np.roll(a,shift=-x+int(n/2),axis=0),shift=-y+int(n/2),axis=1)
+    return a[:n,:n]
     
 def reproduce(prey, preyMask, predators, predatorMask):
     """
