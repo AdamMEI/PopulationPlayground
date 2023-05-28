@@ -58,9 +58,9 @@ PREDATOR_EAT_ENERGY = 50
 #- Maximum Energy Value
 PREDATOR_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREDATOR_REPRODUCTION_START_TIME = 5
+PREDATOR_REPRODUCTION_START_TIME = 20
 #- Eyesight Radius
-PREDATOR_EYESIGHT = 20
+PREDATOR_EYESIGHT = 10
 #- Energy Spent in Single Move Cycle
 PREDATOR_MOVE_ENERGY = 2
 #- Number of Cycles stunned
@@ -75,15 +75,15 @@ PREDATOR_REPRODUCTION_THRESHOLD = 80
 #- Starting Number of Agents
 PREY_START_NUM = 80
 #- Starting Energy Value
-PREY_START_ENERGY = 50
+PREY_START_ENERGY = 100
 #- Energy Gain by Eating 
 PREY_EAT_ENERGY = 10
 #- Maximum Energy Value
 PREY_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREY_REPRODUCTION_START_TIME = 30
+PREY_REPRODUCTION_START_TIME = 20
 #- Eyesight Radius
-PREY_EYESIGHT = 10
+PREY_EYESIGHT = 5
 #- Energy Spent in Single Move Cycle
 PREY_MOVE_ENERGY = 1
 #- Energy Threshold for Eating
@@ -416,7 +416,7 @@ def movePredators(preyMask, predators, predatorMask):
         #- no prey within eyesight
         if len(distances) == 0:
             #- random movement in x and y direction
-            dx.append(np.random.choice([-1,0,1]))
+            dx.append(np.random.choice([0,1]))
             dy.append(np.random.choice([-1,0,1]))
         #- atleast 1 prey within eyesight
         else:
@@ -432,7 +432,7 @@ def movePredators(preyMask, predators, predatorMask):
             else: dx.append(0)
             if eyesight[closestPreyIndex,1] > center[1]: dy.append(1+boost)
             elif eyesight[closestPreyIndex,1] < center[1]: dy.append(-1-boost)
-            else: dy.append(1)
+            else: dy.append(0)
     dx = np.asarray(dx)
     dy = np.asarray(dy)
 
@@ -545,14 +545,14 @@ def movePrey(prey, preyMask, predatorMask, plants):
         #- no predators within eyesight
         if len(predDistances) == 0:
             #- no plants within eyesight or prey is not hungry
-            if len(plantDistances) == 0 or prey[x,y,0] < PREY_HUNGRY:
+            if len(plantDistances) == 0 or prey[x,y,0] > PREY_HUNGRY:
                 #- random movement in x and y direction
-                dx.append(np.random.choice([-1,0,1]))
-                dy.append(np.random.choice([-1,0,1]))
+                dx.append(np.random.choice([-1,1]))
+                dy.append(np.random.choice([-1,1]))
             #- atleast 1 plant within eyesight
             else:
                 #- Index of closest plant(s)
-                closestPlantIndex = np.where(plantDistances == plantDistances.min())
+                closestPlantIndex = np.where(plantDistances == plantDistances[np.nonzero(plantDistances)].min())
                 #- Randomly choose closest plant if there is more than one option
                 if len(closestPlantIndex[0]) > 1: closestPlantIndex = np.random.choice(closestPlantIndex[0])
                 else: closestPlantIndex = closestPlantIndex[0][0]
@@ -562,7 +562,7 @@ def movePrey(prey, preyMask, predatorMask, plants):
                 else: dx.append(0)
                 if plantEyesight[closestPlantIndex,1] > center[1]: dy.append(1)
                 elif plantEyesight[closestPlantIndex,1] < center[1]: dy.append(-1)
-                else: dy.append(1)
+                else: dy.append(0)
         #- atleast 1 predator within eyesight
         else:
             #- Index of closest predator(s)
@@ -576,13 +576,16 @@ def movePrey(prey, preyMask, predatorMask, plants):
             else: dx.append(0)
             if predatorEyesight[closestPredatorIndex,1] > center[1]: dy.append(-1)
             elif predatorEyesight[closestPredatorIndex,1] < center[1]: dy.append(1)
-            else: dy.append(1)
+            else: dy.append(0)
     dx = np.asarray(dx)
     dy = np.asarray(dy)
     
     if not DIAGONAL_MOVEMENT:
-        #- prioritize moving in x direction first (move in y once x coordinates line up)
-        dy = np.where(dx == 0, dy, 0)
+        #- randomly choose either x or y direction to move in, but not both
+        if np.random.random() < 0.5:
+            dy = np.where(dx == 0, dy, 0)
+        else:
+            dx = np.where(dy == 0, dx, 0)
     
     #- movement validation for boundary checks and process movement in arrays
     #- Loop through all prey
@@ -594,6 +597,8 @@ def movePrey(prey, preyMask, predatorMask, plants):
                 prey[x, y, 0] = 0
                 preyMask[x, y] = False
                 continue
+        elif dx[i] == 0 and dy[i] == 0:
+            continue
         #- get neighbors
         neighbors = getNeighbors(x,y,preyMask)
         #- neighbors < 8 when there is another prey as a neighbor
@@ -779,13 +784,13 @@ def getNeighbors(x, y, mask=None):
     #- loop through neighbors to adjust values for boundary conditions
     for i in range(len(neighbors)):
         #- check for going off both bottom and right side of screen
-        if neighbors[i][0] == WIDTH and neighbors[i][1] == HEIGHT:
+        if neighbors[i][0] >= WIDTH and neighbors[i][1] >= HEIGHT:
             neighbors[i] = (0, 0)
         #- check for going off right side of screen
-        elif neighbors[i][0] == WIDTH:
+        elif neighbors[i][0] >= WIDTH:
             neighbors[i] = (0, neighbors[i][1])
         #- check for going off bottom side of screen
-        elif neighbors[i][1] == HEIGHT:
+        elif neighbors[i][1] >= HEIGHT:
             neighbors[i] = (neighbors[i][0], 0)
     #- checks mask against neighbors and removes occupied neighbor cells
     if mask is not None:
