@@ -23,7 +23,7 @@ SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 10
 #- Number of time steps in the simulation
-TIME_STEPS = 1000
+TIME_STEPS = 300
 #- Can agents move diagonally? (affects distance calc)
 DIAGONAL_MOVEMENT = True
 #- Do agents reproduce asexually?
@@ -58,7 +58,7 @@ PREDATOR_EAT_ENERGY = 50
 #- Maximum Energy Value
 PREDATOR_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREDATOR_REPRODUCTION_START_TIME = 20
+PREDATOR_REPRODUCTION_TIME = (15, 25)
 #- Eyesight Radius
 PREDATOR_EYESIGHT = 10
 #- Energy Spent in Single Move Cycle
@@ -81,7 +81,7 @@ PREY_EAT_ENERGY = 10
 #- Maximum Energy Value
 PREY_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREY_REPRODUCTION_START_TIME = 20
+PREY_REPRODUCTION_TIME = (15, 25)
 #- Eyesight Radius
 PREY_EYESIGHT = 5
 #- Energy Spent in Single Move Cycle
@@ -102,6 +102,13 @@ PREY_REPRODUCTION_THRESHOLD = 80
 #- The time required for plants to regrow after being eaten
 PLANT_REGROWTH_TIME = 100
 
+#- Analysis Constants
+#------------------
+#- Whether each plot should be displayed after a simulation, set, or set of
+#  sets.
+LAG_PLOT_DISLPAYS = {"sets": True, "set": True, "simulation": False}
+POPULATION_PLOT_DISPLAYS = {"sets": True, "set": True, "simulation": False}
+
 def runSets():
     """
     Runs multiple sets of simulations, then prints average populations at the
@@ -110,7 +117,7 @@ def runSets():
     preyPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
     predatorPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
     for i in range(SET_NUM):
-        print(f'Running Sets...{i+1}', end='\r')
+        print(f'Running Set {i+1}', end='\r')
         preyPopulations[i], predatorPopulations[i] = runSet()
     print(
 f"""
@@ -123,6 +130,12 @@ Standard Deviations:
     Predators: {np.std(np.average(predatorPopulations[:, :, -1], axis=0))}
 """
         )
+    if POPULATION_PLOT_DISPLAYS["sets"]:
+        plotPopulations(np.average(preyPopulations, axis=(0, 1)),
+                        np.average(predatorPopulations, axis=(0, 1)))
+    if LAG_PLOT_DISLPAYS["sets"]:
+        plotLagCorrelation(np.average(preyPopulations, axis=(0, 1)),
+                           np.average(predatorPopulations, axis=(0, 1)))
 
 def runSet():
     """
@@ -138,7 +151,18 @@ def runSet():
     preyPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
     predatorPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
     for i in range(SIMULATION_NUM):
+        startTime = time.time()
         preyPopulations[i], predatorPopulations[i] = runSimulation(False)
+        if preyPopulations[i, -1] == 0 or predatorPopulations[i, -1] == 0:
+            i -= 1
+            continue
+        print(f"Finished Simulation {i+1}, Time Taken: {round(time.time() - startTime, 3)} seconds")
+    if POPULATION_PLOT_DISPLAYS["set"]:
+        plotPopulations(np.average(preyPopulations, axis=0),
+                        np.average(predatorPopulations, axis=0))
+    if LAG_PLOT_DISLPAYS["set"]:
+        plotLagCorrelation(np.average(preyPopulations, axis=0),
+                           np.average(predatorPopulations, axis=0))
     return preyPopulations, predatorPopulations
 
 def runSimulation(shouldVisualize = False):
@@ -160,7 +184,7 @@ def runSimulation(shouldVisualize = False):
     preyPopulations = np.zeros(TIME_STEPS)
     predatorPopulations = np.zeros(TIME_STEPS)
     #- Initializes the program
-    prey, preyMask, predators, predatorMask, plants,  = initialize()
+    prey, preyMask, predators, predatorMask, plants = initialize()
     if shouldVisualize:
         screen = initVisualization()
     t('X')
@@ -181,15 +205,20 @@ def runSimulation(shouldVisualize = False):
             #- Runs a single move cycle
             movePredators(preyMask, predators, predatorMask)
             movePrey(prey, preyMask, predatorMask, plants)
+            t('1.3')
             reproduce(prey, preyMask, predators, predatorMask)
-            
+            t('1.5')
             preyPopulations[i] = np.count_nonzero(preyMask)
             predatorPopulations[i] = np.count_nonzero(predatorMask)
-            t('1.4')
+            t('1.6')
         else:
             break
     if shouldVisualize:
         pygame.quit()
+    if POPULATION_PLOT_DISPLAYS["simulation"]:
+        plotPopulations(preyPopulations, predatorPopulations)
+    if LAG_PLOT_DISLPAYS["simulation"]:
+        plotLagCorrelation(preyPopulations, predatorPopulations)
     return (preyPopulations, predatorPopulations)
 
 def initialize():
@@ -238,13 +267,40 @@ def initialize():
             i += 1
     #- Sets prey and predator start values
     prey[preyMask, 0] = PREY_START_ENERGY
-    prey[preyMask, 1] = PREY_REPRODUCTION_START_TIME
+    prey[preyMask, 1] = np.random.randint(
+        PREY_REPRODUCTION_TIME[0], PREY_REPRODUCTION_TIME[1], PREY_START_NUM)
     predators[predatorMask, 0] = PREDATOR_START_ENERGY
-    predators[predatorMask, 1] = PREDATOR_REPRODUCTION_START_TIME
+    predators[predatorMask, 1] = np.random.randint(
+        PREDATOR_REPRODUCTION_TIME[0], PREDATOR_REPRODUCTION_TIME[1],
+        PREDATOR_START_NUM)
     #- Initializes plants
     plants = np.zeros((WIDTH, HEIGHT))
     return (prey, preyMask, predators, predatorMask, \
             plants)
+
+def plotPopulations(preyPopulations, predatorPopulations):
+    arange = np.arange(preyPopulations.size)
+    fig, ax = plt.subplots()
+    ax.plot(arange, preyPopulations, label="Prey Populations")
+    ax.plot(arange, predatorPopulations, label="Predator Populations")
+    plt.title("Prey and Predator Populations")
+    plt.xlabel("Time (timesteps)")
+    plt.ylabel("Populations")
+    plt.show()
+
+def plotLagCorrelation(preyPopulations, predatorPopulations,
+                       maxLag = -1):
+    #- Can't use a parameter in the default value of another paramter, so must
+    #  do this instead
+    if maxLag == -1:
+        maxLag = int(np.size(preyPopulations) / 2)
+    plt.xcorr(preyPopulations, predatorPopulations, normed=True,\
+              usevlines=True, maxlags = maxLag)
+    plt.xlabel("Lag (timesteps)")
+    plt.ylabel("Correlation")
+    plt.title("Lag Cross-Correlation Plot Between\n\
+preyPopulations[i + lag] and predatorPopulations[i - lag]")
+    plt.show()
 
 def initVisualization():
     """
@@ -392,7 +448,7 @@ def movePredators(preyMask, predators, predatorMask):
         The locations that contain predators
     """
     #- Array of indices of predator locations in predatorMask
-    predatorIndices = np.argwhere(predatorMask)  
+    predatorIndices = np.argwhere(predatorMask * (predators[:, :, 2] <= 0)) 
     #- lists for keeping track of changes in x and y for each predator
     dx = []
     dy = []
@@ -443,58 +499,37 @@ def movePredators(preyMask, predators, predatorMask):
         else:
             dx = np.where(dy == 0, dx, 0)
             
-    
-    #- Movement validation for boundary checks and process movement in arrays
-    #- Loop through all predators
-    for i in range(len(predatorIndices)):
-        #- x, y indices of current predator in predators array
-        x, y = predatorIndices[i,0], predatorIndices[i,1]
-        #- check if current predator is stunned
-        if predators[x,y,2] > 0:
-            predators[x,y,2] -= 1
-            continue
-        #- if moving causes energy to equal or go below 0, predator dies
-        if (predators[x, y, 0] - PREDATOR_MOVE_ENERGY <= 0):
-                predators[x, y, 0] = 0
-                predatorMask[x, y] = False
-                continue
-        #- get neighbors
-        neighbors = getNeighbors(x,y,predatorMask)
-        #- neighbors < 8 when there is another predator as a neighbor
-        if len(neighbors) < 8:
-            #- move randomly to one of the empty neighbors
-            nx, ny = neighbors[np.random.choice(len(neighbors))]
-            predators[nx, ny, 0] = \
-                predators[x, y, 0] - PREDATOR_MOVE_ENERGY
-            predators[nx, ny, 1] = predators[x, y, 1]
-            predatorMask[nx, ny] = True
-        #- check for going off both bottom and right side of screen
-        elif x + dx[i] >= WIDTH and y + dy[i] >= HEIGHT:
-            predators[0, 0, 0] = predators[x, y, 0] - PREDATOR_MOVE_ENERGY
-            predators[0, 0, 1] = predators[x, y, 1]
-            predatorMask[0, 0] = True
-        #- check for going off right side of screen
-        elif x + dx[i] >= WIDTH:
-            predators[0, y + dy[i], 0] = \
-                predators[x, y, 0] - PREDATOR_MOVE_ENERGY
-            predators[0, y + dy[i], 1] = predators[x, y, 1]
-            predatorMask[0, y + dy[i]] = True    
-        #- check for going off bottom side of screen
-        elif y + dy[i] >= HEIGHT:
-            predators[x + dx[i], 0, 0] = \
-                predators[x, y, 0] - PREDATOR_MOVE_ENERGY
-            predators[x + dx[i], 0, 1] = predators[x, y, 1]
-            predatorMask[x + dx[i], 0] = True
-        #- movement within bounds of screen
-        else:
-            predators[x + dx[i], y + dy[i], 0] = \
-                predators[x, y, 0] - PREDATOR_MOVE_ENERGY
-            predators[x + dx[i], y + dy[i], 1] = predators[x, y, 1]
-            predatorMask[x + dx[i], y + dy[i]] = True
-                
-        #- remove signs of predator in old location
-        predators[x, y, 0] = predators[x, y, 1] = 0
-        predatorMask[x, y] = False
+    #- The number of predators
+    num = predatorIndices.shape[0]
+    #- The new indices of the predators, i.e. their old indices + (dy, dx)
+    newIndices = predatorIndices + np.reshape(np.vstack((dy, dx)).T, (num, 2))
+    #- If there are 0 predators, then return
+    if (newIndices.size == 0):
+        return
+    t('1.3.1')
+    #- Wraps around the borders of the screen
+    newIndices = np.where(newIndices > -1, np.where(
+        newIndices < np.array([HEIGHT, WIDTH]), newIndices,
+       0), np.array([HEIGHT - 1, WIDTH - 1]))
+    #- predators that are staying still, i.e. predators that have the same new indices
+    #  as their old indices
+    stillIndices = predatorMask[newIndices[:, 0], newIndices[:, 1]]
+    #- New indices of moving predators
+    newIndices = newIndices[~stillIndices]
+    #- Old indices of moving predators, i.e. the old indices of all predators except for
+    #  the predators that are staying still
+    movedIndices = predatorIndices[~stillIndices]
+    #- Move predators
+    predators[newIndices[:,0], newIndices[:,1]] = predators[movedIndices[:,0], movedIndices[:,1]]
+    #- Remove predator's energy
+    predators[newIndices[:,0], newIndices[:,1],0] -= PREDATOR_MOVE_ENERGY
+    #- Move predators in mask
+    predatorMask[newIndices[:,0], newIndices[:,1]] = True
+    predatorMask[movedIndices[:,0], movedIndices[:,1]] = False
+    #- Kill starving predators
+    predatorMask[predatorMask] = np.where(predators[predatorMask, 0] <= 0, False, True)
+    predators[predatorMask, 2] -= 1
+    t('1.3.2')
         
 def movePrey(prey, preyMask, predatorMask, plants):
     """
@@ -552,7 +587,10 @@ def movePrey(prey, preyMask, predatorMask, plants):
             #- atleast 1 plant within eyesight
             else:
                 #- Index of closest plant(s)
-                closestPlantIndex = np.where(plantDistances == plantDistances[np.nonzero(plantDistances)].min())
+                if np.size(plantDistances) == 0:
+                    closestPlantIndex = np.array(((center[0], center[1])))
+                else:
+                    closestPlantIndex = np.where(plantDistances == plantDistances[np.nonzero(plantDistances)].min())
                 #- Randomly choose closest plant if there is more than one option
                 if len(closestPlantIndex[0]) > 1: closestPlantIndex = np.random.choice(closestPlantIndex[0])
                 else: closestPlantIndex = closestPlantIndex[0][0]
@@ -587,55 +625,36 @@ def movePrey(prey, preyMask, predatorMask, plants):
         else:
             dx = np.where(dy == 0, dx, 0)
     
-    #- movement validation for boundary checks and process movement in arrays
-    #- Loop through all prey
-    for i in range(len(preyIndices)):
-        #- x, y indices of current prey in prey array
-        x, y = preyIndices[i,0], preyIndices[i,1]
-        #- if moving causes energy to equal or go below 0, prey dies
-        if (prey[x, y, 0] - PREY_MOVE_ENERGY <= 0):
-                prey[x, y, 0] = 0
-                preyMask[x, y] = False
-                continue
-        elif dx[i] == 0 and dy[i] == 0:
-            continue
-        #- get neighbors
-        neighbors = getNeighbors(x,y,preyMask)
-        #- neighbors < 8 when there is another prey as a neighbor
-        if len(neighbors) < 8:
-            #- move randomly to one of the empty neighbors
-            nx, ny = neighbors[np.random.choice(len(neighbors))]
-            prey[nx, ny, 0] = \
-                prey[x, y, 0] - PREY_MOVE_ENERGY
-            prey[nx, ny, 1] = prey[x, y, 1]
-            preyMask[nx, ny] = True
-        #- check for going off both bottom and right side of screen
-        elif x + dx[i] >= WIDTH and y + dy[i] >= HEIGHT:
-            prey[0, 0, 0] = prey[x, y, 0] - PREY_MOVE_ENERGY
-            prey[0, 0, 1] = prey[x, y, 1]
-            preyMask[0, 0] = True
-        #- check for going off right side of screen
-        elif x + dx[i] >= WIDTH:
-            prey[0, y + dy[i], 0] = \
-                prey[x, y, 0] - PREY_MOVE_ENERGY
-            prey[0, y + dy[i], 1] = prey[x, y, 1]
-            preyMask[0, y + dy[i]] = True    
-        #- check for going off bottom side of screen
-        elif y + dy[i] >= HEIGHT:
-            prey[x + dx[i], 0, 0] = \
-                prey[x, y, 0] - PREY_MOVE_ENERGY
-            prey[x + dx[i], 0, 1] = prey[x, y, 1]
-            preyMask[x + dx[i], 0] = True
-        #- movement within bounds of screen
-        else:
-            prey[x + dx[i], y + dy[i], 0] = \
-                prey[x, y, 0] - PREY_MOVE_ENERGY
-            prey[x + dx[i], y + dy[i], 1] = prey[x, y, 1]
-            preyMask[x + dx[i], y + dy[i]] = True
-            
-        #- remove signs of prey in old location
-        prey[x, y, 0] = prey[x, y, 1] = 0
-        preyMask[x, y] = False
+    #- The number of prey
+    num = preyIndices.shape[0]
+    #- The new indices of the prey, i.e. their old indices + (dy, dx)
+    newIndices = preyIndices + np.reshape(np.vstack((dy, dx)).T, (num, 2))
+    #- If there are 0 prey, then return
+    if (newIndices.size == 0):
+        return
+    t('1.3.1')
+    #- Wraps around the borders of the screen
+    newIndices = np.where(newIndices > -1, np.where(
+        newIndices < np.array([HEIGHT, WIDTH]), newIndices,
+       0), np.array([HEIGHT - 1, WIDTH - 1]))
+    #- Prey that are staying still, i.e. prey that have the same new indices
+    #  as their old indices
+    stillPreyMask = preyMask[newIndices[:, 0], newIndices[:, 1]]
+    #- New indices of moving prey
+    newIndices = newIndices[~stillPreyMask]
+    #- Old indices of moving prey, i.e. the old indices of all prey except for
+    #  the prey that are staying still
+    movedIndices = preyIndices[~stillPreyMask]
+    #- Move prey
+    prey[newIndices[:,0], newIndices[:,1]] = prey[movedIndices[:,0], movedIndices[:,1]]
+    #- Remove prey energy
+    prey[movedIndices[:,0], movedIndices[:,1],0] -= PREY_MOVE_ENERGY
+    #- Move prey in mask
+    preyMask[newIndices[:,0], newIndices[:,1]] = True
+    preyMask[movedIndices[:,0], movedIndices[:,1]] = False
+    #- Kill starving prey
+    preyMask[preyMask] = np.where(prey[preyMask, 0] <= 0, False, True)
+    t('1.3.2')
         
 def eyesightArray(a, x, y, n):
     """
@@ -719,8 +738,10 @@ def reproduce(prey, preyMask, predators, predatorMask):
             newx, newy = neighbors[np.random.choice(len(neighbors))]
             predatorMask[newx, newy] = True
             predators[newx, newy, 0] = PREDATOR_START_ENERGY
-            predators[newx, newy, 1] = PREDATOR_REPRODUCTION_START_TIME
-            predators[x,y,1] = PREDATOR_REPRODUCTION_START_TIME
+            predators[newx, newy, 1] = random.randint( \
+                PREDATOR_REPRODUCTION_TIME[0], PREDATOR_REPRODUCTION_TIME[1])
+            predators[x,y,1] = random.randint( \
+                PREDATOR_REPRODUCTION_TIME[0], PREDATOR_REPRODUCTION_TIME[1])
                 
     #- Array of indices of prey locations
     preyIndices = np.argwhere(preyMask)
@@ -758,8 +779,10 @@ def reproduce(prey, preyMask, predators, predatorMask):
             newx, newy = neighbors[np.random.choice(np.arange(len(neighbors)))]
             preyMask[newx, newy] = True
             prey[newx, newy, 0] = PREDATOR_START_ENERGY
-            prey[newx, newy, 1] = PREY_REPRODUCTION_START_TIME
-            prey[x,y,1] = PREY_REPRODUCTION_START_TIME
+            prey[newx, newy, 1] = random.randint( \
+                PREY_REPRODUCTION_TIME[0], PREY_REPRODUCTION_TIME[1])
+            prey[x,y,1] = random.randint( \
+                PREY_REPRODUCTION_TIME[0], PREY_REPRODUCTION_TIME[1])
 
 def getNeighbors(x, y, mask=None):
     """
