@@ -520,7 +520,8 @@ def movePredators(preyMask, predators, predatorMask):
     #  the predators that are staying still
     movedIndices = predatorIndices[~stillIndices]
     #- Move predators
-    predators[newIndices[:,0], newIndices[:,1]] = predators[movedIndices[:,0], movedIndices[:,1]]
+    predators[newIndices[:,0], newIndices[:,1], :] = predators[movedIndices[:,0], movedIndices[:,1], :]
+    predators[movedIndices[:,0], movedIndices[:,1], :] = 0
     #- Remove predator's energy
     predators[newIndices[:,0], newIndices[:,1],0] -= PREDATOR_MOVE_ENERGY
     #- Move predators in mask
@@ -646,9 +647,10 @@ def movePrey(prey, preyMask, predatorMask, plants):
     #  the prey that are staying still
     movedIndices = preyIndices[~stillPreyMask]
     #- Move prey
-    prey[newIndices[:,0], newIndices[:,1]] = prey[movedIndices[:,0], movedIndices[:,1]]
+    prey[newIndices[:,0], newIndices[:,1], :] = prey[movedIndices[:,0], movedIndices[:,1], :]
+    prey[movedIndices[:,0], movedIndices[:,1], :] = 0
     #- Remove prey energy
-    prey[movedIndices[:,0], movedIndices[:,1],0] -= PREY_MOVE_ENERGY
+    prey[newIndices[:,0], newIndices[:,1],0] -= PREY_MOVE_ENERGY
     #- Move prey in mask
     preyMask[newIndices[:,0], newIndices[:,1]] = True
     preyMask[movedIndices[:,0], movedIndices[:,1]] = False
