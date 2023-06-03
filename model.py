@@ -33,8 +33,8 @@ ASEXUAL = True
 #- Display Constants
 #--------------------
 #- Grid size
-WIDTH = 150 #- Horizontal
-HEIGHT = 150 #- Vertical
+WIDTH = 100 #- Horizontal
+HEIGHT = 100 #- Vertical
 #- The number of pixels for each grid location
 PIXEL_SIZE = 5
 #- FPS of visualization
@@ -51,31 +51,31 @@ PLANT_UNGROWN_COLOR = (255, 255, 0)
 #- Predator Constants
 #---------------------
 #- Starting Number of Agents
-PREDATOR_START_NUM = 100
+PREDATOR_START_NUM = 40
 #- Starting Energy Value
 PREDATOR_START_ENERGY = 50
 #- Energy Gain by Eating
 PREDATOR_EAT_ENERGY = 50
 #- Maximum Energy Value
-PREDATOR_MAX_ENERGY = 100
+PREDATOR_MAX_ENERGY = 200
 #- Reproduction Timer (How many cycles between possible reproductions)
 PREDATOR_REPRODUCTION_TIME = (25, 35)
 #- Eyesight Radius
-PREDATOR_EYESIGHT = 10
+PREDATOR_EYESIGHT = 5
 #- Energy Spent in Single Move Cycle
 PREDATOR_MOVE_ENERGY = 1
 #- Number of Cycles stunned
-STUN_TIME = 5
-#- Radius that another predator has to be in for reproduction to occure
+STUN_TIME = 3
+#- Radius that another predator has to be in for reproduction to occur
 PREDATOR_REPRODUCTION_RANGE = 5
 #- Energy threshold for reproduction
-PREDATOR_REPRODUCTION_THRESHOLD = 80
+PREDATOR_REPRODUCTION_THRESHOLD = 150
 
 #- Prey Constants
 #-----------------
 #- Starting Number of Agents
-PREY_START_NUM = 150
-PREY_SPEED = 0.85
+PREY_START_NUM = 80
+PREY_SPEED = 0.5
 #- Starting Energy Value
 PREY_START_ENERGY = 50
 #- Energy Gain by Eating 
@@ -91,7 +91,7 @@ PREY_MOVE_ENERGY = 1
 #- Energy Threshold for Eating
 PREY_HUNGRY = 90
 #- Percent chance of stunning predators
-STUN_CHANCE = 0.5
+STUN_CHANCE = 0.3
 #- Percent chance of killing predators
 PREY_KILL_CHANCE = 0.01
 #- Radius that another prey has to be in for reproduction to occure
@@ -466,6 +466,8 @@ def movePredators(preyMask, predators, predatorMask):
     predatorMask : 2d boolean array
         The locations that contain predators
     """
+    #- Lower the stuns on predators
+    predators[predatorMask, 2] -= 1
     #- Array of indices of predator locations in predatorMask
     predatorIndices = np.argwhere(predatorMask * (predators[:, :, 2] <= 0)) 
     #- Array of indices of prey locations in prey mask
@@ -507,11 +509,23 @@ def movePredators(preyMask, predators, predatorMask):
     closest = np.where(np.min(distances, axis=1)[:,np.newaxis] > \
                        PREDATOR_EYESIGHT, tooFar, wrappedPreyIndices[argmin])
     #- An array to use to move randomly if they are too far away
-    randomMovement = np.random.choice([-1, 0, 1], size=closest.shape)
+    randomIndex = np.random.randint(9, size=predatorIndices.shape[0])
+    randomMovement = np.zeros((9, 2), dtype=int)
+    randomMovement[0] = np.array([-1, -1])
+    randomMovement[1] = np.array([-1, 0])
+    randomMovement[2] = np.array([-1, 1])
+    randomMovement[3] = np.array([0, -1])
+    randomMovement[4] = np.array([0, 0])
+    randomMovement[5] = np.array([0, 1])
+    randomMovement[6] = np.array([1, -1])
+    randomMovement[7] = np.array([1, 0])
+    randomMovement[8] = np.array([1, 1])
     #- Determine the change in y and change in x for each predator
-    dy = np.where(closest[:,0] == predatorIndices[:, 0], randomMovement[:, 0],
+    dy = np.where(closest[:,0] == predatorIndices[:, 0],
+                  randomMovement[randomIndex[:], 0],
                   np.sign(closest[:, 0] - predatorIndices[:, 0]))
-    dx = np.where(closest[:,1] == predatorIndices[:, 1], randomMovement[:, 1],
+    dx = np.where(closest[:,1] == predatorIndices[:, 1],
+                  randomMovement[randomIndex[:], 1],
                   np.sign(closest[:, 1] - predatorIndices[:, 1]))
     
     #- The number of predators
@@ -575,11 +589,6 @@ def movePredators(preyMask, predators, predatorMask):
     predatorMask[movedIndices[:,0], movedIndices[:,1]] = False
     #- Kill starving predators
     predatorMask[predatorMask] = np.where(predators[predatorMask, 0] <= 0, False, True)
-    predators[predatorMask, 2] -= 1
-    if (np.count_nonzero(predatorMask) < 10):
-        print(f"Stuns: {predators[predatorMask, 2]}")
-        print(f"Predator Mask: {predatorMask}")
-        print(f"Predator Mask Count Nonzero: {np.count_nonzero(predatorMask)}")
     t('1.3.2.3')
 
 
@@ -636,9 +645,9 @@ def movePrey(prey, preyMask, predatorMask, plants):
     #- Otherwise, use manhattan/cityblock distance
     else:
         distances = cdist(preyIndices, wrappedPredatorIndices, 'cityblock')
-    #- If prey are too far from the predator, then use the predator's own
+    #- If prey are too far from the prey, then use the prey's own
     #  location as a placeholder
-    tooFar = np.array([[0, 0]]*distances.shape[0])
+    tooFar = preyIndices
     #- The indexes of the closest prey
     argmin = np.argmin(distances, axis=1)
     #- The locations of the closest prey (or tooFar if they are outside of
@@ -646,13 +655,25 @@ def movePrey(prey, preyMask, predatorMask, plants):
     closest = np.where(np.min(distances, axis=1)[:,np.newaxis] > \
                        PREY_EYESIGHT, tooFar, wrappedPredatorIndices[argmin])
     #- An array to use to move randomly if they are too far away
-    randomMovement = np.random.choice([-1, 1], size=closest.shape)
+    randomIndex = np.random.randint(9, size=preyIndices.shape[0])
+    randomMovement = np.zeros((9, 2), dtype=int)
+    randomMovement[0] = np.array([-1, -1])
+    randomMovement[1] = np.array([-1, 0])
+    randomMovement[2] = np.array([-1, 1])
+    randomMovement[3] = np.array([0, -1])
+    randomMovement[4] = np.array([0, 0])
+    randomMovement[5] = np.array([0, 1])
+    randomMovement[6] = np.array([1, -1])
+    randomMovement[7] = np.array([1, 0])
+    randomMovement[8] = np.array([1, 1])
     #- Determine the change in y and change in x for each prey
-    dy = np.where(closest[:,0] == 0, randomMovement[:, 0],
+    dy = np.where(closest[:,0] == preyIndices[:, 0],
+                  randomMovement[randomIndex[:], 0],
                   np.sign(preyIndices[:, 0] - closest[:, 0]))
-    dx = np.where(closest[:,1] == 0, randomMovement[:, 1],
+    dx = np.where(closest[:,1] == preyIndices[:, 1],
+                  randomMovement[randomIndex[:], 1],
                   np.sign(preyIndices[:, 1] - closest[:, 1]))
-    
+    #- Determine the change in y and change in x for each prey
     if not DIAGONAL_MOVEMENT:
         #- randomly choose either x or y direction to move in, but not both
         if np.random.random() < 0.5:
@@ -807,7 +828,7 @@ def reproduce(prey, preyMask, predators, predatorMask):
     newLocations = []
     #- Loops through each new child
     for i in range(neighbors.shape[0]):
-        #- Determiens which neighbors are viable
+        #- Determines which neighbors are viable
         viableNeighbors = neighbors[i][neighbors[i] != -1]
         #- If there are no viable neighbors, then try again next timestep
         if viableNeighbors.size == 0:
@@ -830,12 +851,15 @@ def reproduce(prey, preyMask, predators, predatorMask):
     #- Give all the appropriate start values (energy, reproduction time, etc.)
     predators[newLocations[:, 0], newLocations[:, 1], 0] = \
         PREDATOR_START_ENERGY
-    predators[newLocations[:, 0], newLocations[:, 1], 1] = random.randint( \
-        PREDATOR_REPRODUCTION_TIME[0], PREDATOR_REPRODUCTION_TIME[1])
+    predators[newLocations[:, 0], newLocations[:, 1], 1] = np.random.randint( \
+        PREDATOR_REPRODUCTION_TIME[0], PREDATOR_REPRODUCTION_TIME[1],
+        size=predators[newLocations[:, 0], newLocations[:, 1], 0].shape)
     #- Set the old predator's reproduction time back to the start amount
     predators[reproducingIndices[:, 0], reproducingIndices[:, 1],1] = \
-        random.randint(PREDATOR_REPRODUCTION_TIME[0],
-                       PREDATOR_REPRODUCTION_TIME[1])
+        np.random.randint(PREDATOR_REPRODUCTION_TIME[0],
+                          PREDATOR_REPRODUCTION_TIME[1],
+                          size=predators[reproducingIndices[:, 0],
+                                         reproducingIndices[:, 1], 0].shape)
     t('1.9.1')
     
                 
@@ -903,7 +927,7 @@ def reproduce(prey, preyMask, predators, predatorMask):
     newLocations = []
     #- Loops through each new child
     for i in range(neighbors.shape[0]):
-        #- Determiens which neighbors are viable
+        #- Determines which neighbors are viable
         viableNeighbors = neighbors[i][neighbors[i] != -1]
         #- If there are no viable neighbors, then try again next timestep
         if viableNeighbors.size == 0:
@@ -926,12 +950,14 @@ def reproduce(prey, preyMask, predators, predatorMask):
     #- Give all the appropriate start values (energy, reproduction time, etc.)
     prey[newLocations[:, 0], newLocations[:, 1], 0] = \
         PREY_START_ENERGY
-    prey[newLocations[:, 0], newLocations[:, 1], 1] = random.randint( \
-        PREY_REPRODUCTION_TIME[0], PREY_REPRODUCTION_TIME[1])
+    prey[newLocations[:, 0], newLocations[:, 1], 1] = np.random.randint( \
+        PREY_REPRODUCTION_TIME[0], PREY_REPRODUCTION_TIME[1],
+        size=prey[newLocations[:, 0], newLocations[:, 1], 0].shape)
     #- Set the old prey's reproduction time back to the start amount
     prey[reproducingIndices[:, 0], reproducingIndices[:, 1],1] = \
-        random.randint(PREY_REPRODUCTION_TIME[0],
-                       PREY_REPRODUCTION_TIME[1])
+        np.random.randint(PREY_REPRODUCTION_TIME[0], PREY_REPRODUCTION_TIME[1],
+                          size=prey[reproducingIndices[:, 0],
+                                    reproducingIndices[:, 1], 0].shape)
     t('1.9.2')
     
 #- Dictionary containing overall times for each action
@@ -1009,6 +1035,6 @@ def printTimes():
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
     np.set_printoptions(threshold=sys.maxsize)
-    preyPopulations, predatorPopulations = runSimulation(False)
+    preyPopulations, predatorPopulations = runSimulation(True)
 
 
