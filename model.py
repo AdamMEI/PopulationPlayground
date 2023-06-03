@@ -51,7 +51,7 @@ PLANT_UNGROWN_COLOR = (255, 255, 0)
 #- Predator Constants
 #---------------------
 #- Starting Number of Agents
-PREDATOR_START_NUM = 50
+PREDATOR_START_NUM = 110
 #- Starting Energy Value
 PREDATOR_START_ENERGY = 50
 #- Energy Gain by Eating
@@ -63,7 +63,7 @@ PREDATOR_REPRODUCTION_TIME = (15, 25)
 #- Eyesight Radius
 PREDATOR_EYESIGHT = 10
 #- Energy Spent in Single Move Cycle
-PREDATOR_MOVE_ENERGY = 0
+PREDATOR_MOVE_ENERGY = 1.1
 #- Number of Cycles stunned
 STUN_TIME = 5
 #- Radius that another predator has to be in for reproduction to occure
@@ -74,8 +74,8 @@ PREDATOR_REPRODUCTION_THRESHOLD = 80
 #- Prey Constants
 #-----------------
 #- Starting Number of Agents
-PREY_START_NUM = 80
-PREY_SPEED = 0.95
+PREY_START_NUM = 200
+PREY_SPEED = 0.85
 #- Starting Energy Value
 PREY_START_ENERGY = 50
 #- Energy Gain by Eating 
@@ -93,7 +93,7 @@ PREY_HUNGRY = 90
 #- Percent chance of stunning predators
 STUN_CHANCE = 0.5
 #- Percent chance of killing predators
-PREY_KILL_CHANCE = 0.01
+PREY_KILL_CHANCE = 0.0
 #- Radius that another prey has to be in for reproduction to occure
 PREY_REPRODUCTION_RANGE = 5
 #- Energy threshold for reproduction
@@ -193,9 +193,10 @@ def runSimulation(shouldVisualize = False):
         screen = initVisualization()
     t('X')
     for i in range(TIME_STEPS):
+        t('TIMESTEP')
         #print(f'Running...{i}', end='\r')
         #- stop simulation if there are no prey or no predators alive
-        if np.any(preyMask):# and np.any(predatorMask):
+        if np.any(preyMask) and np.any(predatorMask):
             if shouldVisualize:
                 screen.fill((255,255,255))
                 #- Visualizes the grid
@@ -528,15 +529,33 @@ def movePredators(preyMask, predators, predatorMask):
     
     #- Prevents predators from overlapping
     #- The number of predators moving to each spot
-    counts = np.zeros(newIndices.shape[0])
+    counts = np.zeros(newIndices.shape[0], dtype=bool)
+    t('1.3.2.1')
+    countsEachIndex = {}
+    #- For each predator
+    for i in range(predatorIndices.shape[0]):
+        #- Say "there was a predator here previously"
+        #- Need to set it to 1 to differentiate between predators that were
+        #  previously there and predators that are moving there
+        countsEachIndex[tuple(predatorIndices[i])] = 1
     #- For each predator
     for i in range(newIndices.shape[0]):
-        #- Essentially, figures out if there are other predators moving to the
-        #  same place
-        counts[i] = np.any(np.all(newIndices[0:i] == newIndices[i], axis=1)) + \
-            np.any(np.all(predatorIndices[i+1:] == newIndices[i], axis=1))
+        #- Make the indices array into a tuple for hashing
+        tup = tuple(newIndices[i])
+        #- Basically, check if there was predator with a greater i already at
+        #  this location or there is a predator with a lower i moving there
+        if tup in countsEachIndex and countsEachIndex[tup]:
+            counts[i] = True
+        #- Need to set it to 2 to differentiate between predators that were
+        #  previously there and predators that are moving there
+        countsEachIndex[tup] = 2
+        #- Don't have to worry about the old positions of predators with a
+        #  lower i value
+        if countsEachIndex[tuple(predatorIndices[i])] == 1:
+            countsEachIndex[tuple(predatorIndices[i])] = 0
+    t('1.3.2.2')
     #- If other predators are moving to the same place, then don't move
-    newIndices = np.where(counts[:,np.newaxis] > 0, predatorIndices, newIndices)
+    newIndices = np.where(counts[:,np.newaxis], predatorIndices, newIndices)
     
     #- Predators that are staying still, i.e. predators that have the same new indices
     #  as their old indices
@@ -557,8 +576,10 @@ def movePredators(preyMask, predators, predatorMask):
     #- Kill starving predators
     predatorMask[predatorMask] = np.where(predators[predatorMask, 0] <= 0, False, True)
     predators[predatorMask, 2] -= 1
-    t('1.3.2')
-       
+    t('1.3.2.3')
+
+
+
 def movePrey(prey, preyMask, predatorMask, plants):
     """
     Represents one move cycle for prey
@@ -652,13 +673,30 @@ def movePrey(prey, preyMask, predatorMask, plants):
     
     #- Prevents prey from overlapping
     #- The number of prey moving to each spot
-    counts = np.zeros(newIndices.shape[0])
+    counts = np.zeros(newIndices.shape[0], dtype=bool)
+    t('1.2.2.1')
+    countsEachIndex = {}
+    #- For each prey
+    for i in range(preyIndices.shape[0]):
+        #- Say "there was a prey here previously"
+        #- Need to set it to 1 to differentiate between prey that were
+        #  previously there and prey that are moving there
+        countsEachIndex[tuple(preyIndices[i])] = 1
     #- For each prey
     for i in range(newIndices.shape[0]):
-        #- Essentially, figures out if there are other prey moving to the
-        #  same place
-        counts[i] = np.any(np.all(newIndices[0:i] == newIndices[i], axis=1)) + \
-            np.any(np.all(preyIndices[i+1:] == newIndices[i], axis=1))
+        #- Make the indices array into a tuple for hashing
+        tup = tuple(newIndices[i])
+        #- Basically, check if there was prey with a greater i already at
+        #  this location or there is a prey with a lower i moving there
+        if tup in countsEachIndex and countsEachIndex[tup]:
+            counts[i] = True
+        #- Need to set it to 2 to differentiate between prey that were
+        #  previously there and prey that are moving there
+        countsEachIndex[tup] = 2
+        #- Don't have to worry about the old positions of prey with a
+        #  lower i value
+        if countsEachIndex[tuple(preyIndices[i])] == 1:
+            countsEachIndex[tuple(preyIndices[i])] = 0
     #- If other prey are moving to the same place, then don't move
     newIndices = np.where(counts[:,np.newaxis] > 0, preyIndices, newIndices)
     
@@ -681,32 +719,6 @@ def movePrey(prey, preyMask, predatorMask, plants):
     #- Kill starving prey
     preyMask[preyMask] = np.where(prey[preyMask, 0] <= 0, False, True)
     t('1.2.2')
-    
-def eyesightArray(a, x, y, n):
-    """
-    Given an array a, returns an array with radius n with center element a[x,y]
-    This is used to assist in consistent calculations across periodic boundary
-    conditions
-     
-    Source: https://stackoverflow.com/questions/4148292/how-do-i-select-a-window-from-a-numpy-array-with-periodic-boundary-conditions
-    
-    Parameters
-    -------
-    a : array-like
-    x : int
-        x index in array a
-    y : int 
-        y index in array a
-    n : int
-        radius of desired array
-        
-    Returns
-    -------
-    Subarray of input array with radius n with center element a[x,y] 
-    """
-    n = (n*2) + 1
-    a=np.roll(np.roll(a,shift=-x+int(n/2),axis=0),shift=-y+int(n/2),axis=1)
-    return a[:n,:n]
     
 def reproduce(prey, preyMask, predators, predatorMask):
     """
@@ -917,52 +929,13 @@ def reproduce(prey, preyMask, predators, predatorMask):
         random.randint(PREY_REPRODUCTION_TIME[0],
                        PREY_REPRODUCTION_TIME[1])
     t('1.9.2')
-
-def getNeighbors(x, y, mask=None):
-    """
-    Returns a list of indice tuples for neighboring cells of (x,y), optionally 
-    can be provided a mask to remove occupied neighboring cells from the returned list
-    
-    Parameters
-    -------
-    x : int
-        x indice in an array
-    y : int 
-        y indice in an array
-    mask : boolean array
-        mask to check for occupied neighbors
-        
-    Returns
-    -------
-    list of indice tuples
-    """
-    #- get list of neighbor cells (x, y) coordinates to current predator
-    neighbors = [(x-1, y-1),(x, y-1),(x+1, y-1),(x-1, y),(x+1, y),(x-1, y+1),(x, y+1),(x+1, y+1)]
-    #- loop through neighbors to adjust values for boundary conditions
-    for i in range(len(neighbors)):
-        #- check for going off both bottom and right side of screen
-        if neighbors[i][0] >= WIDTH and neighbors[i][1] >= HEIGHT:
-            neighbors[i] = (0, 0)
-        #- check for going off right side of screen
-        elif neighbors[i][0] >= WIDTH:
-            neighbors[i] = (0, neighbors[i][1])
-        #- check for going off bottom side of screen
-        elif neighbors[i][1] >= HEIGHT:
-            neighbors[i] = (neighbors[i][0], 0)
-    #- checks mask against neighbors and removes occupied neighbor cells
-    if mask is not None:
-        for neighbor in neighbors:
-            if mask[neighbor[0],neighbor[1]]:
-                neighbors.remove(neighbor)
-    #- if no valid neighbors, return original cell as only valid location
-    if len(neighbors) == 0:
-        return [(x,y)]
-    return neighbors
     
 #- Dictionary containing overall times for each action
 times = {}
 #- Tracks the previous timestamp when time was measured
 lastTime = time.time()
+#- The number of total timesteps
+timesteps = 0
 
 def t(label):
     """
@@ -973,9 +946,15 @@ def t(label):
     Parameters
     ----------
     label : string
-        The label for this time, usually following 'x.y.z' format
+        The label for this time, usually following 'x.y.z' format. If this is
+        labeled "TIMESTEP" then it is instead a counter to say that a timestep
+        has passed.
     """
+    global timesteps
     global lastTime
+    if label == "TIMESTEP":
+        timesteps += 1
+        return
     curTime = time.time()
     #- If this section has already been added to the dictionary:
     if label in times:
@@ -1008,6 +987,7 @@ def printTimes():
     for name in times.keys():
         if len(name) > maxLength:
             maxLength = len(name)
+    print(f"Average time per timestep: {total/timesteps} seconds")
     for name, timeAmount in times.items():
         #- Commented out code uses sig figs instead of decimal places
         #magnitude = math.floor(math.log10(abs(timeAmount / total))) + 3
