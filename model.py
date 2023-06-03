@@ -51,7 +51,7 @@ PLANT_UNGROWN_COLOR = (255, 255, 0)
 #- Predator Constants
 #---------------------
 #- Starting Number of Agents
-PREDATOR_START_NUM = 200
+PREDATOR_START_NUM = 100
 #- Starting Energy Value
 PREDATOR_START_ENERGY = 50
 #- Energy Gain by Eating
@@ -74,7 +74,7 @@ PREDATOR_REPRODUCTION_THRESHOLD = 80
 #- Prey Constants
 #-----------------
 #- Starting Number of Agents
-PREY_START_NUM = 200
+PREY_START_NUM = 150
 PREY_SPEED = 0.85
 #- Starting Energy Value
 PREY_START_ENERGY = 50
@@ -576,6 +576,10 @@ def movePredators(preyMask, predators, predatorMask):
     #- Kill starving predators
     predatorMask[predatorMask] = np.where(predators[predatorMask, 0] <= 0, False, True)
     predators[predatorMask, 2] -= 1
+    if (np.count_nonzero(predatorMask) < 10):
+        print(f"Stuns: {predators[predatorMask, 2]}")
+        print(f"Predator Mask: {predatorMask}")
+        print(f"Predator Mask Count Nonzero: {np.count_nonzero(predatorMask)}")
     t('1.3.2.3')
 
 
