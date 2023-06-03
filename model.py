@@ -23,7 +23,7 @@ SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 10
 #- Number of time steps in the simulation
-TIME_STEPS = 3000
+TIME_STEPS = 10000
 #- Can agents move diagonally? (affects distance calc)
 DIAGONAL_MOVEMENT = True
 #- Do agents reproduce asexually?
@@ -58,11 +58,11 @@ PREDATOR_EAT_ENERGY = 50
 #- Maximum Energy Value
 PREDATOR_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREDATOR_REPRODUCTION_TIME = (10, 20)
+PREDATOR_REPRODUCTION_TIME = (30, 40)
 #- Eyesight Radius
 PREDATOR_EYESIGHT = 10
 #- Energy Spent in Single Move Cycle
-PREDATOR_MOVE_ENERGY = 0.2
+PREDATOR_MOVE_ENERGY = 0.5
 #- Number of Cycles stunned
 STUN_TIME = 5
 #- Radius that another predator has to be in for reproduction to occure
@@ -91,7 +91,7 @@ PREY_HUNGRY = 90
 #- Percent chance of stunning predators
 STUN_CHANCE = 0.5
 #- Percent chance of killing predators
-PREY_KILL_CHANCE = 0.01
+PREY_KILL_CHANCE = 0.0
 #- Radius that another prey has to be in for reproduction to occure
 PREY_REPRODUCTION_RANGE = 5
 #- Energy threshold for reproduction
@@ -106,8 +106,8 @@ PLANT_REGROWTH_TIME = 250
 #------------------
 #- Whether each plot should be displayed after a simulation, set, or set of
 #  sets.
-LAG_PLOT_DISLPAYS = {"sets": True, "set": True, "simulation": False}
-POPULATION_PLOT_DISPLAYS = {"sets": True, "set": True, "simulation": False}
+LAG_PLOT_DISLPAYS = {"sets": True, "set": True, "simulation": True}
+POPULATION_PLOT_DISPLAYS = {"sets": True, "set": True, "simulation": True}
 
 def runSets():
     """
@@ -249,6 +249,15 @@ def initialize():
     preyMask = np.zeros((WIDTH, HEIGHT), dtype=bool)
     predators = np.zeros((WIDTH, HEIGHT, 3))
     predatorMask = np.zeros((WIDTH, HEIGHT), dtype=bool)
+    """
+    global PREY_START_NUM
+    global PREDATOR_START_NUM
+    PREY_START_NUM = 1
+    PREDATOR_START_NUM = 2
+    preyMask[10, 10] = True
+    predatorMask[13, 10] = True
+    predatorMask[13, 11] = True
+    """
     #- Create masks
     i = 0
     while i < PREY_START_NUM:
@@ -477,7 +486,7 @@ def movePredators(preyMask, predators, predatorMask):
     #- Determine the change in y and change in x for each predator
     dy = np.where(closest[:,0] == predatorIndices[:, 0], randomMovement[:, 0],
                   np.sign(closest[:, 0] - predatorIndices[:, 0]))
-    dx = np.where(closest[:,1] == predatorIndices[:, 0], randomMovement[:, 1],
+    dx = np.where(closest[:,1] == predatorIndices[:, 1], randomMovement[:, 1],
                   np.sign(closest[:, 1] - predatorIndices[:, 1]))
     
     #- The number of predators
@@ -492,7 +501,12 @@ def movePredators(preyMask, predators, predatorMask):
     newIndices = np.where(newIndices > -1, np.where(
         newIndices < np.array([HEIGHT, WIDTH]), newIndices,
        0), np.array([HEIGHT - 1, WIDTH - 1]))
-    #- predators that are staying still, i.e. predators that have the same new indices
+    counts = np.zeros(newIndices.shape[0])
+    for i in range(newIndices.shape[0]):
+        counts[i] = np.any(np.all(newIndices[0:i] == newIndices[i], axis=1)) + \
+            np.any(np.all(predatorIndices[i+1:] == newIndices[i], axis=1))
+    newIndices = np.where(counts[:,np.newaxis] > 0, predatorIndices, newIndices)
+    #- Predators that are staying still, i.e. predators that have the same new indices
     #  as their old indices
     stillIndices = predatorMask[newIndices[:, 0], newIndices[:, 1]]
     #- New indices of moving predators
@@ -684,7 +698,6 @@ def reproduce(prey, preyMask, predators, predatorMask):
     canReproduce = canReproduceTime * canReproduceFood * inRange
     #- Get the indexes of predators that can reproduce
     reproducingIndices = predatorIndices[canReproduce]
-    
     #- Neighbors represent a 3x3 grid of all the neighbors of each index:
     #  0  1  2
     #  3  X  4
@@ -948,6 +961,6 @@ def printTimes():
 
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
-    runSet()
+    runSimulation(False)
 
 
