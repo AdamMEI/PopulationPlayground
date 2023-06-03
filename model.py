@@ -8,6 +8,7 @@ Created on Wed May 17 10:58:49 2023
 
 #------------------------------- MODULE IMPORTS -------------------------------
 
+import sys
 import numpy as np
 import random
 import pygame
@@ -23,7 +24,7 @@ SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 10
 #- Number of time steps in the simulation
-TIME_STEPS = 10000
+TIME_STEPS = 3000
 #- Can agents move diagonally? (affects distance calc)
 DIAGONAL_MOVEMENT = True
 #- Do agents reproduce asexually?
@@ -52,17 +53,17 @@ PLANT_UNGROWN_COLOR = (255, 255, 0)
 #- Starting Number of Agents
 PREDATOR_START_NUM = 50
 #- Starting Energy Value
-PREDATOR_START_ENERGY = 50
-#- Energy Gain by Eating 
+PREDATOR_START_ENERGY = 100
+#- Energy Gain by Eating
 PREDATOR_EAT_ENERGY = 50
 #- Maximum Energy Value
 PREDATOR_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREDATOR_REPRODUCTION_TIME = (30, 40)
+PREDATOR_REPRODUCTION_TIME = (15, 25)
 #- Eyesight Radius
 PREDATOR_EYESIGHT = 10
 #- Energy Spent in Single Move Cycle
-PREDATOR_MOVE_ENERGY = 0.5
+PREDATOR_MOVE_ENERGY = 1.5
 #- Number of Cycles stunned
 STUN_TIME = 5
 #- Radius that another predator has to be in for reproduction to occure
@@ -73,17 +74,18 @@ PREDATOR_REPRODUCTION_THRESHOLD = 80
 #- Prey Constants
 #-----------------
 #- Starting Number of Agents
-PREY_START_NUM = 50
+PREY_START_NUM = 80
+PREY_SPEED = 0.95
 #- Starting Energy Value
-PREY_START_ENERGY = 50
+PREY_START_ENERGY = 100
 #- Energy Gain by Eating 
-PREY_EAT_ENERGY = 5
+PREY_EAT_ENERGY = 100
 #- Maximum Energy Value
 PREY_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREY_REPRODUCTION_TIME = (20, 30)
+PREY_REPRODUCTION_TIME = (15, 25)
 #- Eyesight Radius
-PREY_EYESIGHT = 7
+PREY_EYESIGHT = 5
 #- Energy Spent in Single Move Cycle
 PREY_MOVE_ENERGY = 1
 #- Energy Threshold for Eating
@@ -91,11 +93,11 @@ PREY_HUNGRY = 90
 #- Percent chance of stunning predators
 STUN_CHANCE = 0.5
 #- Percent chance of killing predators
-PREY_KILL_CHANCE = 0.0
+PREY_KILL_CHANCE = 0.01
 #- Radius that another prey has to be in for reproduction to occure
 PREY_REPRODUCTION_RANGE = 5
 #- Energy threshold for reproduction
-PREY_REPRODUCTION_THRESHOLD = 70
+PREY_REPRODUCTION_THRESHOLD = 80
 
 #- Plant Constants
 #------------------
@@ -193,7 +195,7 @@ def runSimulation(shouldVisualize = False):
     for i in range(TIME_STEPS):
         #print(f'Running...{i}', end='\r')
         #- stop simulation if there are no prey or no predators alive
-        if np.any(preyMask) and np.any(predatorMask):
+        if np.any(preyMask):# and np.any(predatorMask):
             if shouldVisualize:
                 screen.fill((255,255,255))
                 #- Visualizes the grid
@@ -309,7 +311,7 @@ def plotLagCorrelation(preyPopulations, predatorPopulations,
     plt.xlabel("Lag (timesteps)")
     plt.ylabel("Correlation")
     plt.title("Lag Cross-Correlation Plot Between\n\
-preyPopulations[i + lag] and predatorPopulations[i - lag]")
+preyPopulations[i + lag] and predatorPopulations[i]")
     plt.show()
     
 def initVisualization():
@@ -328,6 +330,7 @@ def initVisualization():
     screen.fill((255, 255, 255))
     return screen
 
+visualizing = True
 def visualize(screen, preyMask, predators, predatorMask, plants):
     """
     Visualizes the prey, predators, and plants using the constant colors and
@@ -348,35 +351,40 @@ def visualize(screen, preyMask, predators, predatorMask, plants):
         The locations that contain plants
     """
     clock = pygame.time.Clock()
+    global visualizing
     #- Checks to see if the window has been closed
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return False
-    #- Iterates through grid
-    for i in range(HEIGHT):
-        for j in range(WIDTH):
-            #- Draws a rectangle for each prey, predator, and plant
-            rect = pygame.Rect(j * PIXEL_SIZE, i * PIXEL_SIZE,
-                               PIXEL_SIZE, PIXEL_SIZE)
-            if preyMask[i, j]:
-                pygame.draw.rect(screen, PREY_COLOR, rect)
-            elif predatorMask[i, j]:
-                if predators[i,j, 2] > 0:
-                    pygame.draw.rect(screen, PREDATOR_STUN_COLOR, rect)
-                else:    
-                    pygame.draw.rect(screen, PREDATOR_COLOR, rect)
-            else:
-                plantUngrownColor = np.array(PLANT_UNGROWN_COLOR)
-                plantGrownColor = np.array(PLANT_GROWN_COLOR)
-                #- Interpolates color between plantUngrownColor and
-                #  plantGrownColor depending on how grown the plant is
-                plantColor = plantUngrownColor * plants[i, j] / \
-                    PLANT_REGROWTH_TIME + plantGrownColor * (1 -
-                    (plants[i, j] / PLANT_REGROWTH_TIME))
-                pygame.draw.rect(screen, plantColor, rect)
-    #- Updates display
-    pygame.display.flip()
-    clock.tick(FPS)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_a:
+                visualizing = not visualizing
+    if visualizing:
+        #- Iterates through grid
+        for i in range(HEIGHT):
+            for j in range(WIDTH):
+                #- Draws a rectangle for each prey, predator, and plant
+                rect = pygame.Rect(j * PIXEL_SIZE, i * PIXEL_SIZE,
+                                   PIXEL_SIZE, PIXEL_SIZE)
+                if preyMask[i, j]:
+                    pygame.draw.rect(screen, PREY_COLOR, rect)
+                elif predatorMask[i, j]:
+                    if predators[i,j, 2] > 0:
+                        pygame.draw.rect(screen, PREDATOR_STUN_COLOR, rect)
+                    else:    
+                        pygame.draw.rect(screen, PREDATOR_COLOR, rect)
+                else:
+                    plantUngrownColor = np.array(PLANT_UNGROWN_COLOR)
+                    plantGrownColor = np.array(PLANT_GROWN_COLOR)
+                    #- Interpolates color between plantUngrownColor and
+                    #  plantGrownColor depending on how grown the plant is
+                    plantColor = plantUngrownColor * plants[i, j] / \
+                        PLANT_REGROWTH_TIME + plantGrownColor * (1 -
+                        (plants[i, j] / PLANT_REGROWTH_TIME))
+                    pygame.draw.rect(screen, plantColor, rect)
+        #- Updates display
+        pygame.display.flip()
+        clock.tick(FPS)
     return True
 
 def feed(prey, preyMask, predators, predatorMask, plants):
@@ -482,7 +490,7 @@ def movePredators(preyMask, predators, predatorMask):
     closest = np.where(np.min(distances, axis=1)[:,np.newaxis] > \
                        PREDATOR_EYESIGHT, tooFar, preyIndices[argmin])
     #- An array to use to move randomly if they are too far away
-    randomMovement = np.random.choice([-1, 1], size=closest.shape)
+    randomMovement = np.random.choice([-1, 0, 1], size=closest.shape)
     #- Determine the change in y and change in x for each predator
     dy = np.where(closest[:,0] == predatorIndices[:, 0], randomMovement[:, 0],
                   np.sign(closest[:, 0] - predatorIndices[:, 0]))
@@ -501,11 +509,19 @@ def movePredators(preyMask, predators, predatorMask):
     newIndices = np.where(newIndices > -1, np.where(
         newIndices < np.array([HEIGHT, WIDTH]), newIndices,
        0), np.array([HEIGHT - 1, WIDTH - 1]))
+    
+    #- Prevents predators from overlapping
+    #- The number of predators moving to each spot
     counts = np.zeros(newIndices.shape[0])
+    #- For each predator
     for i in range(newIndices.shape[0]):
+        #- Essentially, figures out if there are other predators moving to the
+        #  same place
         counts[i] = np.any(np.all(newIndices[0:i] == newIndices[i], axis=1)) + \
             np.any(np.all(predatorIndices[i+1:] == newIndices[i], axis=1))
+    #- If other predators are moving to the same place, then don't move
     newIndices = np.where(counts[:,np.newaxis] > 0, predatorIndices, newIndices)
+    
     #- Predators that are staying still, i.e. predators that have the same new indices
     #  as their old indices
     stillIndices = predatorMask[newIndices[:, 0], newIndices[:, 1]]
@@ -591,6 +607,8 @@ def movePrey(prey, preyMask, predatorMask, plants):
     num = preyIndices.shape[0]
     #- The new indices of the prey, i.e. their old indices + (dy, dx)
     newIndices = preyIndices + np.reshape(np.vstack((dy, dx)).T, (num, 2))
+    newIndices = np.where(np.random.random() < PREY_SPEED, newIndices,
+                          preyIndices)
     #- If there are 0 prey, then return
     if (newIndices.size == 0):
         return
@@ -599,6 +617,19 @@ def movePrey(prey, preyMask, predatorMask, plants):
     newIndices = np.where(newIndices > -1, np.where(
         newIndices < np.array([HEIGHT, WIDTH]), newIndices,
        0), np.array([HEIGHT - 1, WIDTH - 1]))
+    
+    #- Prevents prey from overlapping
+    #- The number of prey moving to each spot
+    counts = np.zeros(newIndices.shape[0])
+    #- For each prey
+    for i in range(newIndices.shape[0]):
+        #- Essentially, figures out if there are other prey moving to the
+        #  same place
+        counts[i] = np.any(np.all(newIndices[0:i] == newIndices[i], axis=1)) + \
+            np.any(np.all(preyIndices[i+1:] == newIndices[i], axis=1))
+    #- If other prey are moving to the same place, then don't move
+    newIndices = np.where(counts[:,np.newaxis] > 0, preyIndices, newIndices)
+    
     #- Prey that are staying still, i.e. prey that have the same new indices
     #  as their old indices
     stillPreyMask = preyMask[newIndices[:, 0], newIndices[:, 1]]
@@ -720,9 +751,9 @@ def reproduce(prey, preyMask, predators, predatorMask):
        0), np.array([HEIGHT - 1, WIDTH - 1]))
     
     #- Determines which neighboring cells are occupied
-    unViableNeighbors = np.all(np.isin(neighbors, predatorIndices), axis=2)
+    viableNeighbors = np.all(np.isin(neighbors, predatorIndices), axis=2)
     #- Fills those bad cells with -1
-    neighbors[unViableNeighbors] = -1
+    neighbors[~viableNeighbors] = -1
     
     #- Creates an empty list for the new locations of each prey/predator
     newLocations = []
@@ -961,6 +992,7 @@ def printTimes():
 
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
-    runSimulation(False)
+    np.set_printoptions(threshold=sys.maxsize)
+    preyPopulations, predatorPopulations = runSimulation(True)
 
 
