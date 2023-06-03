@@ -53,7 +53,7 @@ PLANT_UNGROWN_COLOR = (255, 255, 0)
 #- Starting Number of Agents
 PREDATOR_START_NUM = 50
 #- Starting Energy Value
-PREDATOR_START_ENERGY = 100
+PREDATOR_START_ENERGY = 50
 #- Energy Gain by Eating
 PREDATOR_EAT_ENERGY = 50
 #- Maximum Energy Value
@@ -63,7 +63,7 @@ PREDATOR_REPRODUCTION_TIME = (15, 25)
 #- Eyesight Radius
 PREDATOR_EYESIGHT = 10
 #- Energy Spent in Single Move Cycle
-PREDATOR_MOVE_ENERGY = 1.5
+PREDATOR_MOVE_ENERGY = 0
 #- Number of Cycles stunned
 STUN_TIME = 5
 #- Radius that another predator has to be in for reproduction to occure
@@ -77,7 +77,7 @@ PREDATOR_REPRODUCTION_THRESHOLD = 80
 PREY_START_NUM = 80
 PREY_SPEED = 0.95
 #- Starting Energy Value
-PREY_START_ENERGY = 100
+PREY_START_ENERGY = 50
 #- Energy Gain by Eating 
 PREY_EAT_ENERGY = 100
 #- Maximum Energy Value
@@ -474,12 +474,28 @@ def movePredators(preyMask, predators, predatorMask):
     if preyIndices.size == 0 or predatorIndices.size == 0:
         return
     
+    #- The number of prey
+    num = preyIndices.shape[0]
+    #- Creating a copy of each of the prey indices around the map so that
+    #  predators can see prey around the borders
+    wrappedPreyIndices = np.zeros((preyIndices.shape[0] * 9,
+                                   preyIndices.shape[1]), dtype=int)
+    wrappedPreyIndices[0:num] =       preyIndices + np.array([-HEIGHT, -WIDTH])
+    wrappedPreyIndices[num:num*2] =   preyIndices + np.array([-HEIGHT, 0])
+    wrappedPreyIndices[num*2:num*3] = preyIndices + np.array([-HEIGHT, WIDTH])
+    wrappedPreyIndices[num*3:num*4] = preyIndices + np.array([0, -WIDTH])
+    wrappedPreyIndices[num*4:num*5] = preyIndices + np.array([0, 0])
+    wrappedPreyIndices[num*5:num*6] = preyIndices + np.array([0, WIDTH])
+    wrappedPreyIndices[num*6:num*7] = preyIndices + np.array([HEIGHT, -WIDTH])
+    wrappedPreyIndices[num*7:num*8] = preyIndices + np.array([HEIGHT, 0])
+    wrappedPreyIndices[num*8:num*9] = preyIndices + np.array([HEIGHT, WIDTH])
+    
     #- If moving diagonally, use euclidean distance
     if DIAGONAL_MOVEMENT:
-        distances = cdist(predatorIndices, preyIndices, 'euclidean')
+        distances = cdist(predatorIndices, wrappedPreyIndices, 'euclidean')
     #- Otherwise, use manhattan/cityblock distance
     else:
-        distances = cdist(predatorIndices, preyIndices, 'cityblock')
+        distances = cdist(predatorIndices, wrappedPreyIndices, 'cityblock')
     #- If prey are too far from the predator, then use the predator's own
     #  location as a placeholder
     tooFar = np.copy(predatorIndices)
@@ -488,7 +504,7 @@ def movePredators(preyMask, predators, predatorMask):
     #- The locations of the closest prey (or tooFar if they are outside of
     #  eysight)
     closest = np.where(np.min(distances, axis=1)[:,np.newaxis] > \
-                       PREDATOR_EYESIGHT, tooFar, preyIndices[argmin])
+                       PREDATOR_EYESIGHT, tooFar, wrappedPreyIndices[argmin])
     #- An array to use to move randomly if they are too far away
     randomMovement = np.random.choice([-1, 0, 1], size=closest.shape)
     #- Determine the change in y and change in x for each predator
@@ -573,12 +589,28 @@ def movePrey(prey, preyMask, predatorMask, plants):
     if preyIndices.size == 0 or predatorIndices.size == 0:
         return
     
+    #- The number of predators
+    num = predatorIndices.shape[0]
+    #- Creating a copy of each of the prey indices around the map so that
+    #  predators can see predator around the borders
+    wrappedPredatorIndices = np.zeros((predatorIndices.shape[0] * 9,
+                                   predatorIndices.shape[1]), dtype=int)
+    wrappedPredatorIndices[0:num] =       predatorIndices + np.array([-HEIGHT, -WIDTH])
+    wrappedPredatorIndices[num:num*2] =   predatorIndices + np.array([-HEIGHT, 0])
+    wrappedPredatorIndices[num*2:num*3] = predatorIndices + np.array([-HEIGHT, WIDTH])
+    wrappedPredatorIndices[num*3:num*4] = predatorIndices + np.array([0, -WIDTH])
+    wrappedPredatorIndices[num*4:num*5] = predatorIndices + np.array([0, 0])
+    wrappedPredatorIndices[num*5:num*6] = predatorIndices + np.array([0, WIDTH])
+    wrappedPredatorIndices[num*6:num*7] = predatorIndices + np.array([HEIGHT, -WIDTH])
+    wrappedPredatorIndices[num*7:num*8] = predatorIndices + np.array([HEIGHT, 0])
+    wrappedPredatorIndices[num*8:num*9] = predatorIndices + np.array([HEIGHT, WIDTH])
+    
     #- If moving diagonally, use euclidean distance
     if DIAGONAL_MOVEMENT:
-        distances = cdist(preyIndices, predatorIndices, 'euclidean')
+        distances = cdist(preyIndices, wrappedPredatorIndices, 'euclidean')
     #- Otherwise, use manhattan/cityblock distance
     else:
-        distances = cdist(preyIndices, predatorIndices, 'cityblock')
+        distances = cdist(preyIndices, wrappedPredatorIndices, 'cityblock')
     #- If prey are too far from the predator, then use the predator's own
     #  location as a placeholder
     tooFar = np.array([[0, 0]]*distances.shape[0])
@@ -587,7 +619,7 @@ def movePrey(prey, preyMask, predatorMask, plants):
     #- The locations of the closest prey (or tooFar if they are outside of
     #  eysight)
     closest = np.where(np.min(distances, axis=1)[:,np.newaxis] > \
-                       PREY_EYESIGHT, tooFar, predatorIndices[argmin])
+                       PREY_EYESIGHT, tooFar, wrappedPredatorIndices[argmin])
     #- An array to use to move randomly if they are too far away
     randomMovement = np.random.choice([-1, 1], size=closest.shape)
     #- Determine the change in y and change in x for each prey
