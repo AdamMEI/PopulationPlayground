@@ -51,7 +51,7 @@ PLANT_UNGROWN_COLOR = (255, 255, 0)
 #- Predator Constants
 #---------------------
 #- Starting Number of Agents
-PREDATOR_START_NUM = 110
+PREDATOR_START_NUM = 200
 #- Starting Energy Value
 PREDATOR_START_ENERGY = 50
 #- Energy Gain by Eating
@@ -59,11 +59,11 @@ PREDATOR_EAT_ENERGY = 50
 #- Maximum Energy Value
 PREDATOR_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
-PREDATOR_REPRODUCTION_TIME = (15, 25)
+PREDATOR_REPRODUCTION_TIME = (25, 35)
 #- Eyesight Radius
 PREDATOR_EYESIGHT = 10
 #- Energy Spent in Single Move Cycle
-PREDATOR_MOVE_ENERGY = 1.1
+PREDATOR_MOVE_ENERGY = 1
 #- Number of Cycles stunned
 STUN_TIME = 5
 #- Radius that another predator has to be in for reproduction to occure
@@ -79,7 +79,7 @@ PREY_SPEED = 0.85
 #- Starting Energy Value
 PREY_START_ENERGY = 50
 #- Energy Gain by Eating 
-PREY_EAT_ENERGY = 100
+PREY_EAT_ENERGY = 5
 #- Maximum Energy Value
 PREY_MAX_ENERGY = 100
 #- Reproduction Timer (How many cycles between possible reproductions)
@@ -93,7 +93,7 @@ PREY_HUNGRY = 90
 #- Percent chance of stunning predators
 STUN_CHANCE = 0.5
 #- Percent chance of killing predators
-PREY_KILL_CHANCE = 0.0
+PREY_KILL_CHANCE = 0.01
 #- Radius that another prey has to be in for reproduction to occure
 PREY_REPRODUCTION_RANGE = 5
 #- Energy threshold for reproduction
@@ -194,7 +194,7 @@ def runSimulation(shouldVisualize = False):
     t('X')
     for i in range(TIME_STEPS):
         t('TIMESTEP')
-        #print(f'Running...{i}', end='\r')
+        print(f'Running...{i}', end='\r')
         #- stop simulation if there are no prey or no predators alive
         if np.any(preyMask) and np.any(predatorMask):
             if shouldVisualize:
@@ -660,7 +660,7 @@ def movePrey(prey, preyMask, predatorMask, plants):
     num = preyIndices.shape[0]
     #- The new indices of the prey, i.e. their old indices + (dy, dx)
     newIndices = preyIndices + np.reshape(np.vstack((dy, dx)).T, (num, 2))
-    newIndices = np.where(np.random.random() < PREY_SPEED, newIndices,
+    newIndices = np.where(np.random.random(size=preyIndices.shape) < PREY_SPEED, newIndices,
                           preyIndices)
     #- If there are 0 prey, then return
     if (newIndices.size == 0):
@@ -1005,6 +1005,6 @@ def printTimes():
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
     np.set_printoptions(threshold=sys.maxsize)
-    preyPopulations, predatorPopulations = runSimulation(True)
+    preyPopulations, predatorPopulations = runSimulation(False)
 
 
