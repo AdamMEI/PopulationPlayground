@@ -35,11 +35,11 @@ from scipy.spatial.distance import cdist
 #- Simulation Constants
 #-----------------------
 #- Number of sets of simulations run
-SET_NUM = 10
+SET_NUM = 20
 #- Number of simulations run per set
-SIMULATION_NUM = 20
+SIMULATION_NUM = 10
 #- Number of time steps in the simulation
-TIME_STEPS = 1000
+TIME_STEPS = 3000
 #- Can agents move diagonally? (affects distance calc)
 DIAGONAL_MOVEMENT = True
 #- Do agents reproduce asexually?
@@ -123,8 +123,8 @@ PLANT_REGROWTH_TIME = 250
 #------------------
 #- Whether each plot should be displayed after a simulation, set, or set of
 #  sets.
-LAG_PLOT_DISLPAYS = {"sets": True, "set": True, "simulation": False}
-POPULATION_PLOT_DISPLAYS = {"sets": True, "set": True, "simulation": False}
+LAG_PLOT_DISLPAYS = {"sets": True, "set": False, "simulation": False}
+POPULATION_PLOT_DISPLAYS = {"sets": True, "set": False, "simulation": False}
 
 def runSets():
     """
@@ -170,7 +170,6 @@ def runSet():
     i = 0
     while i < SIMULATION_NUM:
         startTime = time.time()
-        globals()['PREDATOR_REPRODUCTION_TIME'] = (PREDATOR_REPRODUCTION_TIME[0]+i*2, PREDATOR_REPRODUCTION_TIME[1]+i*2)
         preyPopulations[i], predatorPopulations[i] = runSimulation(False)
         if preyPopulations[i, -1] == 0 or predatorPopulations[i, -1] == 0:
             print(f'Sim {i+1} failed, rerunning')
@@ -178,6 +177,8 @@ def runSet():
         print(f"Finished Simulation {i+1}, Time Taken: {round(time.time() - startTime, 3)} seconds")
         i += 1
     if POPULATION_PLOT_DISPLAYS["set"]:
+        # plotAveragePopulations(np.mean(preyPopulations, axis=1), np.mean(predatorPopulations, axis=1), \
+            # np.arange(SIMULATION_NUM), 'Normal')
         plotPopulations(np.average(preyPopulations, axis=0),
                         np.average(predatorPopulations, axis=0))
     if LAG_PLOT_DISLPAYS["set"]:
@@ -185,7 +186,7 @@ def runSet():
                            np.average(predatorPopulations, axis=0))
     return preyPopulations, predatorPopulations
 
-def runChangingSet(globalKey, change):
+def runChangingSet(globalKey, default_value, change):
     """
     Runs a single set of simulations with changes made to 
     a global parameter between each simulation run.
@@ -204,27 +205,38 @@ def runChangingSet(globalKey, change):
     predatorPopulations : 2d scalar array
         The number of predators alive at each time step in each simulation
     """
-    preyPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
-    predatorPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
+    preyPopulations = np.zeros((SET_NUM, SIMULATION_NUM))
+    predatorPopulations = np.zeros((SET_NUM, SIMULATION_NUM))
     i = 0
-    numFails = 0
-    while i < SIMULATION_NUM:
-        if numFails == 10:
-            print(f'Changing Set failed, try different parameters')
-            break
-        startTime = time.time()
+    while i < SET_NUM:
+        setStartTime = time.time()
+        simPreyPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
+        simPredatorPopulations = np.zeros((SIMULATION_NUM, TIME_STEPS))
         if type(globals()[globalKey]) == tuple:
-            globals()[globalKey] = (eval(globalKey)[0]+i*change, eval(globalKey)[1]+i*change)
+            globals()[globalKey] = (default_value[0]+i*change, default_value[1]+i*change)
         else:
-            globals()[globalKey] = eval(globalKey)+i*change   
-        preyPopulations[i], predatorPopulations[i] = runSimulation(False)
-        if preyPopulations[i, -1] == 0 or predatorPopulations[i, -1] == 0:
-            print(f'Sim {i+1} failed, rerunning')
-            numFails += 1
-            continue
-        print(f"Finished Simulation {i+1}, Time Taken: {round(time.time() - startTime, 3)} seconds")
-        i += 1
+            globals()[globalKey] = default_value+i*change 
         numFails = 0
+        j = 0  
+        while j < SIMULATION_NUM:
+            if numFails == 10:
+                print(f'Changing Set failed, try different parameters')
+                break
+            startTime = time.time()
+            simPreyPopulations[j], simPredatorPopulations[j] = runSimulation()
+            if simPreyPopulations[j, -1] == 0 or simPredatorPopulations[j, -1] == 0:
+                print(f'Sim {j+1} failed, rerunning')
+                numFails += 1
+                continue
+            print(f"Finished Simulation {j+1}, Time Taken: {round(time.time() - startTime, 3)} seconds")
+            j += 1
+            numFails = 0
+        if numFails == 10:
+            break
+        preyPopulations[i] = np.mean(simPreyPopulations, axis=1) 
+        predatorPopulations[i] = np.mean(simPredatorPopulations, axis=1)
+        print(f'Finished Set {i+1}, Time Taken: {round(time.time() - setStartTime, 3)} seconds')
+        i += 1
     return preyPopulations, predatorPopulations
 
 def plotChangingSet(globalKey, change, xLabel):
@@ -242,18 +254,15 @@ def plotChangingSet(globalKey, change, xLabel):
     xLabel : string
         The xlabel corresponding to the changing parameter
     """
-    if type(globals()[globalKey]) == tuple:
-        original_value = globals()[globalKey]
-        default_value = globals()[globalKey][0]
+    default_value = globals()[globalKey]
+    if type(default_value) == tuple:
+        arange = np.arange(SET_NUM)*change + default_value[0]
     else:
-        default_value = globals()[globalKey]
-    preyPopulations, predatorPopulations = runChangingSet(globalKey, change)
+        arange = np.arange(SET_NUM)*change + default_value
+    preyPopulations, predatorPopulations = runChangingSet(globalKey, default_value, change)
     plotAveragePopulations(np.mean(preyPopulations, axis=1), np.mean(predatorPopulations, axis=1),\
-        np.arange(SIMULATION_NUM)*change + default_value, xLabel)
-    if type(globals()[globalKey]) == tuple:
-        globals()[globalKey] = original_value
-    else:
-        globals()[globalKey] = default_value
+        arange, xLabel)    
+    globals()[globalKey] = default_value
 
 def runSimulation(shouldVisualize = False):
     """
@@ -384,6 +393,7 @@ def plotAveragePopulations(preyAveragePopulations, predatorAveragePopulations, a
     ax.set_title("Prey and Predator Average Population")
     ax.set_xlabel(xLabel)
     ax.set_ylabel("Average Population")
+    ax.legend()
     plt.show()
     
 def plotPopulations(preyPopulations, predatorPopulations):
@@ -394,6 +404,7 @@ def plotPopulations(preyPopulations, predatorPopulations):
     ax.set_title("Prey and Predator Populations")
     ax.set_xlabel("Time (timesteps)")
     ax.set_ylabel("Populations")
+    ax.legend()
     plt.show()
 
 def plotLagCorrelation(preyPopulations, predatorPopulations,
@@ -685,8 +696,6 @@ def movePredators(preyMask, predators, predatorMask):
     #- Kill starving predators
     predatorMask[predatorMask] = np.where(predators[predatorMask, 0] <= 0, False, True)
     t('1.3.2.3')
-
-
 
 def movePrey(prey, preyMask, predatorMask, plants):
     """
@@ -1130,11 +1139,4 @@ def printTimes():
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
     np.set_printoptions(threshold=sys.maxsize)
-    # Good
-    # plotChangingSet('PREDATOR_REPRODUCTION_THRESHOLD', 2, 'Predator Reproduction Energy Threshold')
-    # plotChangingSet('PREDATOR_REPRODUCTION_TIME', 2, 'Predator Minimum Reproduction Time')
-    # Bad (not working because simulations fail)
-    # plotChangingSet('PREY_REPRODUCTION_TIME', 2, 'Prey Minimum Reproduction Time')
-    # plotChangingSet('PREY_REPRODUCTION_THRESHOLD', -2, 'Prey Reproduction Energy Threshold')
-    
-    plotChangingSet('PLANT_REGROWTH_TIME', -10, 'Plant Regrowth Time')
+    runSimulation(True)
