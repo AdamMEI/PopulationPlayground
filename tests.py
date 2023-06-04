@@ -1,13 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Performs a variety of tests on the model.py file.
 """
-Created on Wed May 17 17:38:22 2023
 
-@author: adamthepig
-"""
+#------------------------------------------------------------------------------
+#                           Additional Documentation
+#
+# Modification History:
+# - Viewable on GitHub: https://github.com/AdamMEI/PopulationPlayground
+#
+# Authors
+# - Gabriel Schepman, Applied Computing, University of Washington Bothel
+# - Adam Meilicke, Computer Science and Softare Engineering, University of
+#   Washington Bothell
+#
+# Notes:
+# - Written for Python 3.10.
+# - Model can be tested through visualization and plot analysis. To test, type
+#   "python model.py".
+#
+#==============================================================================
+
+#------------------------------- MODULE IMPORTS -------------------------------
 
 import model
 import numpy as np
+
+#----------------------------------- TESTS ------------------------------------
 
 def spawnTest():
     """
@@ -148,8 +167,14 @@ def eatUngrownPlantTest():
     assert(prey[y, x, 0] == 15)
 
 spawnTest()
+print("PASSED - Spawn Test")
 stunTest()
+print("PASSED - Stun Test")
 killTest()
+print("PASSED - Kill Test")
 eatTest()
+print("PASSED - Eat Test")
 eatPlantTest()
+print("PASSED - Eat Plant Test")
 eatUngrownPlantTest()
+print("PASSED - Eat Ungrown Plant Test")
