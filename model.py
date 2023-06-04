@@ -24,7 +24,7 @@ SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 20
 #- Number of time steps in the simulation
-TIME_STEPS = 1000
+TIME_STEPS = 3000
 #- Can agents move diagonally? (affects distance calc)
 DIAGONAL_MOVEMENT = True
 #- Do agents reproduce asexually?
@@ -209,6 +209,7 @@ def runChangingSet(globalKey, change):
             continue
         print(f"Finished Simulation {i+1}, Time Taken: {round(time.time() - startTime, 3)} seconds")
         i += 1
+        numFails = 0
     return preyPopulations, predatorPopulations
 
 def plotChangingSet(globalKey, change, xLabel):
@@ -227,13 +228,17 @@ def plotChangingSet(globalKey, change, xLabel):
         The xlabel corresponding to the changing parameter
     """
     if type(globals()[globalKey]) == tuple:
+        original_value = globals()[globalKey]
         default_value = globals()[globalKey][0]
     else:
         default_value = globals()[globalKey]
     preyPopulations, predatorPopulations = runChangingSet(globalKey, change)
     plotAveragePopulations(np.mean(preyPopulations, axis=1), np.mean(predatorPopulations, axis=1),\
         np.arange(SIMULATION_NUM)*change + default_value, xLabel)
-    globals()[globalKey] = default_value
+    if type(globals()[globalKey]) == tuple:
+        globals()[globalKey] = original_value
+    else:
+        globals()[globalKey] = default_value
 
 def runSimulation(shouldVisualize = False):
     """
@@ -260,7 +265,7 @@ def runSimulation(shouldVisualize = False):
     t('X')
     for i in range(TIME_STEPS):
         t('TIMESTEP')
-        print(f'Running...{i}', end='\r')
+        #print(f'Running...{i}', end='\r')
         #- stop simulation if there are no prey or no predators alive
         if np.any(preyMask) and np.any(predatorMask):
             if shouldVisualize:
@@ -1110,5 +1115,11 @@ def printTimes():
 #- Checks if this file is being run directly and not imported
 if (__name__ == '__main__'):
     np.set_printoptions(threshold=sys.maxsize)
-    plotChangingSet('PREDATOR_REPRODUCTION_THRESHOLD', -2, 'Predator Reproduction Energy Threshold')
-    plotChangingSet('PREDATOR_REPRODUCTION_TIME', 2, 'Predator Minimum Reproduction Time')
+    # Good
+    # plotChangingSet('PREDATOR_REPRODUCTION_THRESHOLD', 2, 'Predator Reproduction Energy Threshold')
+    # plotChangingSet('PREDATOR_REPRODUCTION_TIME', 2, 'Predator Minimum Reproduction Time')
+    # Bad (not working because simulations fail)
+    # plotChangingSet('PREY_REPRODUCTION_TIME', 2, 'Prey Minimum Reproduction Time')
+    # plotChangingSet('PREY_REPRODUCTION_THRESHOLD', -2, 'Prey Reproduction Energy Threshold')
+    
+    plotChangingSet('PLANT_REGROWTH_TIME', -10, 'Plant Regrowth Time')
