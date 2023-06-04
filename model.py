@@ -24,7 +24,7 @@ SET_NUM = 10
 #- Number of simulations run per set
 SIMULATION_NUM = 20
 #- Number of time steps in the simulation
-TIME_STEPS = 3000
+TIME_STEPS = 1000
 #- Can agents move diagonally? (affects distance calc)
 DIAGONAL_MOVEMENT = True
 #- Do agents reproduce asexually?
