@@ -6,20 +6,23 @@
    try to escape the predators. The plants regrow over time.
 """
 
-#-----------------------------------------------------------------------
-#                       Additional Documentation
+#------------------------------------------------------------------------------
+#                           Additional Documentation
 #
 # Modification History:
-# - 7 May 2023:  Original by Adam Meilicke, Computer Science and
-#   Softare Engineering, University of Washington Bothell. Passed
-#   passably reasonable tests.
+# - Viewable on GitHub: https://github.com/AdamMEI/PopulationPlayground
+#
+# Authors
+# - Gabriel Schepman, Applied Computing, University of Washington Bothel
+# - Adam Meilicke, Computer Science and Softare Engineering, University of
+#   Washington Bothell
 #
 # Notes:
 # - Written for Python 3.10.
-# - Module can be tested through visualization and plot analysis. To test, type
+# - Model can be tested through visualization and plot analysis. To test, type
 #   "python model.py".
 #
-#=======================================================================
+#==============================================================================
 
 #------------------------------- MODULE IMPORTS -------------------------------
 
@@ -51,7 +54,7 @@ ASEXUAL = True
 WIDTH = 100 #- Horizontal
 HEIGHT = 100 #- Vertical
 #- The number of pixels for each grid location
-PIXEL_SIZE = 5
+PIXEL_SIZE = 8
 #- FPS of visualization
 FPS = 30
 #- The visualization colors
@@ -123,28 +126,29 @@ PLANT_REGROWTH_TIME = 250
 #------------------
 #- Whether each plot should be displayed after a simulation, set, or set of
 #  sets.
-LAG_PLOT_DISLPAYS = {"sets": True, "set": False, "simulation": False}
-POPULATION_PLOT_DISPLAYS = {"sets": True, "set": False, "simulation": False}
+LAG_PLOT_DISLPAYS = {"sets": True, "set": True, "simulation": True}
+POPULATION_PLOT_DISPLAYS = {"sets": True, "set": True, "simulation": True}
 
 def runSets():
     """
     Runs multiple sets of simulations, then prints average populations at the
-    end of the simulation and the standard deviation of the populations.
+    end of the simulation and the average standard deviations of those sets of
+    populations at each time step.
     """
     preyPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
     predatorPopulations = np.zeros((SET_NUM, SIMULATION_NUM, TIME_STEPS))
     for i in range(SET_NUM):
-        print(f'Running Set {i+1}', end='\r')
+        print(f'Running Set {i+1}')
         preyPopulations[i], predatorPopulations[i] = runSet()
     print(
 f"""
-Populations at end of simulation
-Averages
-    Prey: {np.average(preyPopulations[:, :])}
-    Predators: {np.average(predatorPopulations[:, :])}
-Standard Deviations:
-    Prey: {np.std(np.average(preyPopulations[:, :, -1], axis=0))}
-    Predators: {np.std(np.average(predatorPopulations[:, :, -1], axis=0))}
+Populations across entire simulation
+  Averages
+    Prey: {np.average(preyPopulations)}
+    Predators: {np.average(predatorPopulations)}
+  Average standard deviations at each timestep
+    Prey: {np.average(np.std(np.average(preyPopulations, axis=1), axis=0))}
+    Predators: {np.average(np.std(np.average(predatorPopulations, axis=1), axis=0))}
 """
         )
     if POPULATION_PLOT_DISPLAYS["sets"]:
@@ -153,6 +157,7 @@ Standard Deviations:
     if LAG_PLOT_DISLPAYS["sets"]:
         plotLagCorrelation(np.average(preyPopulations, axis=(0, 1)),
                            np.average(predatorPopulations, axis=(0, 1)))
+    return preyPopulations, predatorPopulations
 
 def runSet():
     """
