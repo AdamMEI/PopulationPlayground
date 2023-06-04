@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Simulates populations of prey and predators on a grid as each tries to
+   survive. The predators chase and eat the prey, although the prey have a
+   chance to stun or kill the predators when attacked. The prey eat plants and
+   try to escape the predators. The plants regrow over time.
 """
-Created on Wed May 17 10:58:49 2023
 
-@author: adamthepig
-"""
+#-----------------------------------------------------------------------
+#                       Additional Documentation
+#
+# Modification History:
+# - 7 May 2023:  Original by Adam Meilicke, Computer Science and
+#   Softare Engineering, University of Washington Bothell. Passed
+#   passably reasonable tests.
+#
+# Notes:
+# - Written for Python 3.10.
+# - Module can be tested through visualization and plot analysis. To test, type
+#   "python model.py".
+#
+#=======================================================================
 
 #------------------------------- MODULE IMPORTS -------------------------------
 
@@ -15,8 +30,8 @@ import pygame
 import matplotlib.pyplot as plt
 import time
 from scipy.spatial.distance import cdist
-#--------------------------------- CONSTANTS ----------------------------------
 
+#--------------------------------- CONSTANTS ----------------------------------
 #- Simulation Constants
 #-----------------------
 #- Number of sets of simulations run
