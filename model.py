@@ -386,6 +386,7 @@ def plotAveragePopulations(preyAveragePopulations, predatorAveragePopulations, a
     fig, ax = plt.subplots()
     ax.plot(arange, preyAveragePopulations, label="Prey Average Populations")
     ax.plot(arange, predatorAveragePopulations, label="Predator Average Populations")
+    ax.legend()
     ax.set_title("Prey and Predator Average Population")
     ax.set_xlabel(xLabel)
     ax.set_ylabel("Average Population")
@@ -396,6 +397,7 @@ def plotPopulations(preyPopulations, predatorPopulations):
     fig, ax = plt.subplots()
     ax.plot(arange, preyPopulations, label="Prey Populations")
     ax.plot(arange, predatorPopulations, label="Predator Populations")
+    ax.legend()
     ax.set_title("Prey and Predator Populations")
     ax.set_xlabel("Time (timesteps)")
     ax.set_ylabel("Populations")
@@ -412,7 +414,7 @@ def plotLagCorrelation(preyPopulations, predatorPopulations,
     plt.xlabel("Lag (timesteps)")
     plt.ylabel("Correlation")
     plt.title("Lag Cross-Correlation Plot Between\n\
-preyPopulations[i + lag] and predatorPopulations[i]")
+preyPopulations[t + lag] and predatorPopulations[t]")
     plt.show()
     
 def initVisualization():
