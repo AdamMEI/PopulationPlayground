@@ -293,8 +293,8 @@ def runSimulation(shouldVisualize = False):
         screen = initVisualization()
     t('X')
     for i in range(TIME_STEPS):
+        #- Counts a timestep to determine how long each timestep takes
         t('TIMESTEP')
-        #print(f'Running...{i}', end='\r')
         #- stop simulation if there are no prey or no predators alive
         if np.any(preyMask) and np.any(predatorMask):
             if shouldVisualize:
@@ -971,7 +971,7 @@ def reproduce(prey, preyMask, predators, predatorMask):
                           PREDATOR_REPRODUCTION_TIME[1],
                           size=predators[reproducingIndices[:, 0],
                                          reproducingIndices[:, 1], 0].shape)
-    t('1.9.1')
+    t('1.4.1')
     
                 
     #- Array of indices of prey locations
@@ -1069,7 +1069,7 @@ def reproduce(prey, preyMask, predators, predatorMask):
         np.random.randint(PREY_REPRODUCTION_TIME[0], PREY_REPRODUCTION_TIME[1],
                           size=prey[reproducingIndices[:, 0],
                                     reproducingIndices[:, 1], 0].shape)
-    t('1.9.2')
+    t('1.4.2')
     
 #- Dictionary containing overall times for each action
 times = {}
@@ -1093,6 +1093,7 @@ def t(label):
     """
     global timesteps
     global lastTime
+    #- If the label is called "TIMESTEP", then it's meant to count a timestep
     if label == "TIMESTEP":
         timesteps += 1
         return
